@@ -1,53 +1,40 @@
-Project Name
+Rakuten Class Prediction (WIP)
 ==============================
 
-This project is a starting Pack for MLOps projects based on the subject "movie_recommandation". It's not perfect so feel free to make some modifications on it.
+This repository tracks an in-progress effort to classify Rakuten product listings into their category codes. The scope includes:
 
-Project Organization
-------------
+- cleaning and ingesting catalog data
+- training and serving text-based models
+- exposing lightweight APIs for experimentation
 
-    ├── LICENSE
-    ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
-    │
-    ├── logs               <- Logs from training and predicting
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
-    │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
-    │
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
-    │   │
-    │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
-    │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   ├── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │   │   └── visualize.py
-    │   └── config         <- Describe the parameters used in train_model.py and predict_model.py
+Documentation will stay intentionally minimal for now and evolve alongside the project. Expect frequent structural changes as we iterate.
 
---------
+Quick start (local data)
+------------------------
 
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+- place `X_train.csv`, `Y_train.csv` and `images/image_train/` inside `data/raw/`
+- run `python src/data/ingestion_sql/etl.py` → generates `data/interim/merged_train_sql.csv`
+- run `python src/data/ingestion_nosql/etl.py` → seeds MongoDB **and** exports `data/interim/merged_train_nosql.csv`
+- optional: `python src/data/incremental_dataset.py` to simulate weekly data growth (use with cron)
+
+Ingestion pipelines
+-------------------
+
+- **SQL/CSV path** (`src/data/ingestion_sql/etl.py`): fusionne `X_train/Y_train`, nettoie `designation/description`, contrôle simplement les images, puis écrit le CSV canonique `merged_train_sql.csv`.
+- **NoSQL path** (`src/data/ingestion_nosql/etl.py`): réutilise la même logique pour générer un DataFrame identique, charge MongoDB (`rakuten_db.produits`) et exporte `merged_train_nosql.csv`.
+- Les deux fichiers partagent les colonnes `productid, imageid, designation, description, prdtypecode`. Pour vérifier rapidement :
+  ```
+  python - <<'PY'
+  import pandas as pd
+  sql = pd.read_csv("data/interim/merged_train_sql.csv")
+  nosql = pd.read_csv("data/interim/merged_train_nosql.csv")
+  print("Colonnes identiques ?", list(sql.columns) == list(nosql.columns))
+  print(f"Tailles -> SQL:{len(sql)}, NoSQL:{len(nosql)}")
+  PY
+  ```
+
+Incremental data simulator
+--------------------------
+
+- `python src/data/incremental_dataset.py` écrit `data/incremented/merged_train_incremental.csv` avec 10 % du dataset lors de la première exécution, puis ajoute +2 % à chaque relance (ratios configurables via `--initial-ratio` et `--step-ratio`).
+- L’état est stocké dans `data/incremented/state.json`, ce qui permet d’automatiser l’exécution (cron/launchd) pour démontrer l’entraînement répété sur des données évolutives.
