@@ -1,2 +1,0 @@
-"""SQL/CSV ingestion package."""
-
