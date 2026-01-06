@@ -127,6 +127,8 @@ Le DAG Airflow s'exécute chaque lundi à minuit et effectue :
 6. **Train Model** : Déclencher l'entraînement (TODO)
 7. **Notify** : Envoyer un résumé de l'exécution
 
+Les conteneurs Docker (PostgreSQL, Airflow, MLflow) doivent rester actifs pour que le DAG tourne ; si l'infra est arrêtée ou le Mac/PC passe en veille, le scheduler ne peut pas progresser. En cas d'interruption, relancer `docker-compose up -d`, vérifier que les services sont "Up" puis, en dépannage, déclencher manuellement `weekly_ml_pipeline` depuis l'UI ou avec `docker exec -it rakuten_airflow_webserver airflow dags trigger weekly_ml_pipeline`.
+
 ### Commandes Utiles
 
 ```bash

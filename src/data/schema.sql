@@ -1,12 +1,6 @@
 -- Rakuten MLOps Database Schema
 -- Incremental Data Pipeline with Audit Trail
-
--- Create databases for different services
-CREATE DATABASE IF NOT EXISTS mlflow_db;
-CREATE DATABASE IF NOT EXISTS airflow_db;
-
--- Connect to main rakuten_db
-\c rakuten_db;
+-- This file is executed in the context of rakuten_db database
 
 -- Main products table (current state)
 CREATE TABLE IF NOT EXISTS products (
@@ -140,9 +134,3 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO rakuten_user;
 INSERT INTO data_loads (batch_name, percentage, total_rows, status, metadata)
 VALUES ('initial', 0, 0, 'completed', '{"note": "Initial state before any data load"}')
 ON CONFLICT (batch_name) DO NOTHING;
-
--- Display table information
-\d+ products
-\d+ labels
-\d+ products_history
-\d+ data_loads
