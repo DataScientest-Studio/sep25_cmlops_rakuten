@@ -1,0 +1,6 @@
+[core]
+    remote = origin
+    autostage = true
+['remote "origin"']
+    url = https://dagshub.com/guillaumevilain.mail/sep25_cmlops_rakuten.dvc
+    auth = basic
