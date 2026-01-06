@@ -1,6 +1,154 @@
+version: '3.8'
+
 services:
-  mongodb_local:
-    image: mongo
-    container_name: mongodb_local
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: rakuten_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rakuten_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rakuten_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-rakuten_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/data/init-db.sh:/docker-entrypoint-initdb.d/01-init-db.sh
+      - ./src/data/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql
     ports:
-      - "27017:27017"
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rakuten_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rakuten_network
+
+  # MLflow Tracking Server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.0
+    container_name: rakuten_mlflow
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://${POSTGRES_USER:-rakuten_user}:${POSTGRES_PASSWORD:-rakuten_pass}@postgres:5432/mlflow_db
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER:-rakuten_user}:${POSTGRES_PASSWORD:-rakuten_pass}@postgres:5432/mlflow_db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rakuten_network
+
+  # Airflow Database Initialization
+  airflow-init:
+    image: apache/airflow:2.8.0-python3.11
+    container_name: rakuten_airflow_init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-rakuten_user}:${POSTGRES_PASSWORD:-rakuten_pass}@postgres:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USER:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+      - airflow_logs:/opt/airflow/logs
+    entrypoint: /bin/bash
+    command: >
+      -c "airflow db migrate &&
+          airflow users create --username $${_AIRFLOW_WWW_USER_USERNAME} --password $${_AIRFLOW_WWW_USER_PASSWORD} --firstname Admin --lastname User --role Admin --email admin@example.com || true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - rakuten_network
+
+  # Airflow Webserver
+  airflow-webserver:
+    image: apache/airflow:2.8.0-python3.11
+    container_name: rakuten_airflow_webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-rakuten_user}:${POSTGRES_PASSWORD:-rakuten_pass}@postgres:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-supersecretkey}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-rakuten_db}
+      POSTGRES_USER: ${POSTGRES_USER:-rakuten_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rakuten_pass}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+      - airflow_logs:/opt/airflow/logs
+      - ./requirements.txt:/requirements.txt
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "pip install -r /requirements.txt &&
+               airflow webserver"
+    depends_on:
+      - postgres
+      - mlflow
+      - airflow-init
+    networks:
+      - rakuten_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    image: apache/airflow:2.8.0-python3.11
+    container_name: rakuten_airflow_scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-rakuten_user}:${POSTGRES_PASSWORD:-rakuten_pass}@postgres:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-rakuten_db}
+      POSTGRES_USER: ${POSTGRES_USER:-rakuten_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rakuten_pass}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+      - airflow_logs:/opt/airflow/logs
+      - ./requirements.txt:/requirements.txt
+    command: >
+      bash -c "pip install -r /requirements.txt &&
+               airflow scheduler"
+    depends_on:
+      - postgres
+      - mlflow
+      - airflow-init
+    networks:
+      - rakuten_network
+
+networks:
+  rakuten_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  airflow_logs:
