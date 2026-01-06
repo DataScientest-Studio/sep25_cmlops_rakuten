@@ -118,11 +118,11 @@ def load_initial_data(percentage: float = None):
     
     # Read data files
     logger.info("Reading CSV files...")
-    x_train = pd.read_csv(DATA_FILES['x_train'])
-    y_train = pd.read_csv(DATA_FILES['y_train'])
+    x_train = pd.read_csv(DATA_FILES['x_train'], index_col=0)
+    y_train = pd.read_csv(DATA_FILES['y_train'], index_col=0)
     
-    # Merge datasets
-    df = x_train.merge(y_train, on='productid', how='inner')
+    # Merge datasets on index
+    df = x_train.join(y_train, how='inner')
     
     total_rows = len(df)
     target_rows = int(total_rows * percentage / 100)
@@ -148,16 +148,17 @@ def load_initial_data(percentage: float = None):
     
     try:
         # Start batch tracking
+        import json
         cursor.execute("""
             INSERT INTO data_loads (batch_name, percentage, total_rows, status, metadata)
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s::jsonb)
             RETURNING id
         """, (
             f'initial_{percentage}pct',
             percentage,
             target_rows,
             'running',
-            {'type': 'initial_load'}
+            json.dumps({'type': 'initial_load'})
         ))
         batch_id = cursor.fetchone()[0]
         conn.commit()
