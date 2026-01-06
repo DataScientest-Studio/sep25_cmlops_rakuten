@@ -1,298 +1,162 @@
-# Rakuten MLOps - Incremental Data Pipeline
+# Rakuten MLOps - Pipeline Incrémental
 
-Pipeline de données incrémentales pour le projet Rakuten avec MLflow tracking, PostgreSQL et Airflow orchestration.
+Pipeline de données incrémentales : PostgreSQL + MLflow + Airflow  
+**Flow:** `Raw CSV (40% → 100%) → PostgreSQL → Balanced Dataset → MLflow → Model`
 
-## 📋 Architecture
+📖 **Architecture détaillée :** [`docs/ARCHITECTURE_PLAN.md`](docs/ARCHITECTURE_PLAN.md)
 
-Ce projet implémente une architecture data-centric MLOps avec :
+---
 
-- **PostgreSQL** : Stockage des données avec audit trail complet
-- **MLflow** : Versioning des datasets et modèles
-- **Airflow** : Orchestration hebdomadaire du pipeline
-- **Random Oversampling** : Balancing des classes pour données déséquilibrées
-
-### Pipeline Flow
-
-```
-Raw CSV (40% → 100%) → PostgreSQL → Balanced Dataset → MLflow → Model
-```
-
-Pour plus de détails, voir [`docs/ARCHITECTURE_PLAN.md`](docs/ARCHITECTURE_PLAN.md)
-
-## 🚀 Quick Start
+## 🚀 Démarrage Rapide
 
 ### Prérequis
+- Docker Desktop en cours d'exécution
+- Données dans `data/raw/` (X_train.csv, Y_train.csv, X_test.csv, images/)
 
-- Docker & Docker Compose
-- Python 3.11+
-- Données brutes dans `data/raw/` (X_train.csv, Y_train.csv, X_test.csv, images/)
-
-### 1. Configuration
-
-Créer un fichier `.env` à partir de l'exemple :
+### 1. Configuration & Démarrage
 
 ```bash
-cp env.example.txt .env
+# Configuration initiale
+make setup
+
+# Démarrer l'infrastructure (PostgreSQL, MLflow, Airflow)
+make start
+
+# Vérifier que les services sont actifs
+make ps
 ```
 
-Éditer `.env` et configurer les mots de passe :
+**Services :**
+- Airflow UI : http://localhost:8080 (admin/admin)
+- MLflow UI : http://localhost:5000
+- PostgreSQL : localhost:5432
+
+### 2. Initialiser les Données (40%)
 
 ```bash
-POSTGRES_PASSWORD=votre_mot_de_passe
-AIRFLOW_PASSWORD=votre_mot_de_passe_airflow
+make init-db
+# ✅ Charge 33,966 produits (40% des données)
 ```
 
-### 2. Démarrer l'infrastructure
+### 3. Tester le Pipeline
 
 ```bash
-# Démarrer tous les services
-docker-compose up -d
-
-# Vérifier que tous les services sont lancés
-docker-compose ps
-```
-
-Services disponibles :
-- **PostgreSQL** : `localhost:5432`
-- **MLflow UI** : http://localhost:5000
-- **Airflow UI** : http://localhost:8080 (admin/admin)
-
-### 3. Initialiser la base de données
-
-```bash
-# Dans le container Airflow
-docker exec -it rakuten_airflow_webserver bash
-
-# Installer les dépendances
-pip install -r /requirements.txt
-
-# Initialiser la base avec 40% des données
-python /opt/airflow/src/data/db_init.py
-```
-
-### 4. Tester le pipeline
-
-```bash
-# Charger les 3% suivants
-python /opt/airflow/src/data/loader.py
-
-# Générer un dataset balancé
-python /opt/airflow/src/data/dataset_generator.py
+# Charger +3% supplémentaires (40% → 43%)
+make load-data
 
 # Vérifier l'état
-python /opt/airflow/src/data/loader.py --status
+make status
+
+# Voir l'historique
+make history
 ```
 
-### 5. Activer le DAG Airflow
+### 4. Activer le DAG Airflow
 
-1. Aller sur http://localhost:8080
-2. Se connecter (admin/admin)
-3. Activer le DAG `weekly_ml_pipeline`
-4. Déclencher manuellement ou attendre l'exécution hebdomadaire
+1. Ouvrir http://localhost:8080
+2. Activer le DAG `weekly_ml_pipeline`
+3. Le DAG s'exécute **chaque lundi à minuit** automatiquement
 
-## 📂 Structure du Projet
+**Note :** Les conteneurs doivent rester actifs. En cas d'arrêt, relancer `make start` puis déclencher manuellement le DAG si nécessaire.
 
-```
-.
-├── docker-compose.yml          # Infrastructure Docker
-├── env.example.txt             # Variables d'environnement (exemple)
-├── requirements.txt            # Dépendances Python
-├── docs/
-│   └── ARCHITECTURE_PLAN.md    # Plan d'architecture détaillé
-├── src/
-│   ├── config.py               # Configuration centralisée
-│   └── data/
-│       ├── schema.sql          # Schéma PostgreSQL
-│       ├── db_init.py          # Initialisation DB (40%)
-│       ├── loader.py           # Chargement incrémental
-│       └── dataset_generator.py # Génération datasets balancés
-├── dags/
-│   └── weekly_ml_pipeline_dag.py # DAG Airflow
-└── data/
-    ├── raw/                    # Données brutes (gitignored)
-    └── training_snapshots/     # Datasets générés (gitignored)
-```
+---
 
-## 🔄 Workflow
-
-### Pipeline Hebdomadaire
-
-Le DAG Airflow s'exécute chaque lundi à minuit et effectue :
-
-1. **Check State** : Vérifier le pourcentage actuel
-2. **Load Data** : Charger +3% de données (40% → 43% → 46% ...)
-3. **Validate** : Vérifier que les données sont correctement chargées
-4. **Generate Dataset** : Créer un dataset balancé via random oversampling
-5. **Log to MLflow** : Versionner le dataset dans MLflow
-6. **Train Model** : Déclencher l'entraînement (TODO)
-7. **Notify** : Envoyer un résumé de l'exécution
-
-Les conteneurs Docker (PostgreSQL, Airflow, MLflow) doivent rester actifs pour que le DAG tourne ; si l'infra est arrêtée ou le Mac/PC passe en veille, le scheduler ne peut pas progresser. En cas d'interruption, relancer `docker-compose up -d`, vérifier que les services sont "Up" puis, en dépannage, déclencher manuellement `weekly_ml_pipeline` depuis l'UI ou avec `docker exec -it rakuten_airflow_webserver airflow dags trigger weekly_ml_pipeline`.
-
-### Commandes Utiles
+## 📋 Commandes Principales
 
 ```bash
-# Vérifier l'état actuel
-python src/data/loader.py --status
+# Infrastructure
+make start              # Démarrer tous les services
+make stop               # Arrêter tous les services
+make restart            # Redémarrer
+make ps                 # Voir les services actifs
+make logs               # Voir tous les logs
 
-# Voir l'historique des chargements
-python src/data/loader.py --history
+# Pipeline de données
+make init-db            # Initialiser avec 40% des données
+make load-data          # Charger +3% supplémentaires
+make status             # Voir l'état actuel
+make history            # Historique des chargements
+make generate-dataset   # Générer un dataset balancé
 
-# Charger manuellement jusqu'à un certain %
-python src/data/loader.py --percentage 50
+# Airflow
+make trigger-dag        # Déclencher le DAG manuellement
+make list-dags          # Lister les DAGs disponibles
 
-# Générer un dataset balancé
-python src/data/dataset_generator.py
+# Accès direct
+make shell-airflow      # Shell dans le conteneur Airflow
+make shell-postgres     # Shell PostgreSQL
 
-# Tester la configuration
-python src/config.py
+# Utilitaires
+make check-health       # Vérifier la santé des services
+make clean              # Nettoyer (⚠️ supprime les données)
 ```
+
+## 🔄 Pipeline Hebdomadaire
+
+**DAG Airflow** : s'exécute chaque lundi à minuit (ou manuellement)
+
+1. **Check State** → 2. **Load Data** (+3%) → 3. **Validate** → 4. **Generate Balanced Dataset** → 5. **Log to MLflow** → 6. **Train Model** → 7. **Notify**
+
+**Progression :** 40% → 43% → 46% → ... → 100% (20 semaines)
+
+---
 
 ## 🗄️ Base de Données
 
-### Tables Principales
+**Tables :** `products`, `labels`, `products_history` (audit trail), `data_loads` (historique)
 
-- **`products`** : Produits (état actuel)
-- **`labels`** : Labels des produits
-- **`products_history`** : Audit trail (toutes les modifications)
-- **`data_loads`** : Historique des chargements
+```bash
+# Accéder à PostgreSQL
+make shell-postgres
 
-### Requêtes Utiles
-
-```sql
--- État actuel
-SELECT * FROM current_data_state;
-
--- Distribution des classes
-SELECT * FROM class_distribution;
-
--- Historique des chargements
-SELECT batch_name, percentage, total_rows, status, completed_at 
-FROM data_loads 
-ORDER BY completed_at DESC;
-
--- Produits ajoutés à une date donnée
-SELECT COUNT(*) FROM products_history 
-WHERE load_batch_id = (SELECT id FROM data_loads WHERE batch_name = 'week_1');
+# Requêtes utiles
+SELECT * FROM current_data_state;           # État actuel
+SELECT * FROM class_distribution;           # Distribution des classes
+SELECT * FROM data_loads ORDER BY completed_at DESC;  # Historique
 ```
 
 ## 📊 MLflow
 
-### Experiments
-
-- **`rakuten_dataset_versioning`** : Datasets générés
-- **`rakuten_model_training`** : Modèles entraînés (TODO)
-
-### Accéder à MLflow
+**UI :** http://localhost:5000  
+**Experiments :** `rakuten_dataset_versioning`, `rakuten_model_training`
 
 ```bash
-# UI Web
-open http://localhost:5000
-
-# Lister les experiments
-mlflow experiments list --tracking-uri http://localhost:5000
-
-# Voir les runs d'un experiment
-mlflow runs list --experiment-name rakuten_dataset_versioning
+# Voir les experiments depuis Airflow
+docker exec rakuten_airflow_webserver mlflow experiments list --tracking-uri http://mlflow:5000
 ```
 
-## 🧪 Tests
+---
+
+## 📝 Logs & Debug
 
 ```bash
-# Tests unitaires (TODO)
-pytest tests/
-
-# Tests d'intégration (TODO)
-pytest tests/integration/
+make logs                    # Tous les logs
+make logs-airflow           # Logs Airflow scheduler
+make logs-postgres          # Logs PostgreSQL
+make logs-mlflow            # Logs MLflow
 ```
 
-## 🔧 Développement Local
+## 🐛 Dépannage
 
+| Problème | Solution |
+|----------|----------|
+| Services ne démarrent pas | `make check-health` puis `make restart` |
+| PostgreSQL inaccessible | `make logs-postgres` puis `docker-compose restart postgres` |
+| DAG n'apparaît pas | `make dag-errors` pour voir les erreurs d'import |
+| Scheduler bloqué | Vérifier que Docker Desktop est actif, relancer `make restart` |
+
+**En cas de problème persistant :**
 ```bash
-# Créer un environnement virtuel
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate     # Windows
-
-# Installer les dépendances
-pip install -r requirements.txt
-
-# Configurer les variables d'environnement pour développement local
-export POSTGRES_HOST=localhost
-export MLFLOW_TRACKING_URI=http://localhost:5000
-export DATA_PATH=$(pwd)/data/raw
-export ENVIRONMENT=local
+make stop && make clean  # ⚠️ Supprime les données
+make start && make init-db
 ```
 
-## 📝 Logs
+---
 
-```bash
-# Logs Airflow
-docker logs rakuten_airflow_scheduler
-docker logs rakuten_airflow_webserver
+## 📚 Documentation
 
-# Logs PostgreSQL
-docker logs rakuten_postgres
+- [Architecture détaillée](docs/ARCHITECTURE_PLAN.md) - Plan complet du pipeline
+- [Résultats des tests](TEST_RESULTS.md) - Tests effectués et validés
+- [Schéma DB](src/data/schema.sql) - Structure PostgreSQL
 
-# Logs MLflow
-docker logs rakuten_mlflow
-```
-
-## 🛑 Arrêter les Services
-
-```bash
-# Arrêter tous les services
-docker-compose down
-
-# Arrêter et supprimer les volumes (attention : perte de données !)
-docker-compose down -v
-```
-
-## 🐛 Troubleshooting
-
-### Problème : Cannot connect to PostgreSQL
-
-```bash
-# Vérifier que le service est lancé
-docker-compose ps postgres
-
-# Vérifier les logs
-docker logs rakuten_postgres
-
-# Redémarrer le service
-docker-compose restart postgres
-```
-
-### Problème : Airflow DAG n'apparaît pas
-
-```bash
-# Vérifier la syntaxe du DAG
-docker exec -it rakuten_airflow_webserver airflow dags list
-
-# Vérifier les erreurs
-docker exec -it rakuten_airflow_webserver airflow dags list-import-errors
-```
-
-### Problème : MLflow ne track pas les runs
-
-```bash
-# Vérifier la connexion à MLflow
-curl http://localhost:5000/health
-
-# Vérifier les logs
-docker logs rakuten_mlflow
-```
-
-## 📚 Documentation Complète
-
-- [Plan d'Architecture](docs/ARCHITECTURE_PLAN.md)
-- [Schéma de Base de Données](src/data/schema.sql)
-- [Configuration](src/config.py)
-
-## 👥 Contributeurs
-
-Projet réalisé dans le cadre de la formation DataScientest MLOps (septembre 2025).
-
-## 📄 License
-
-Voir [LICENSE](LICENSE)
+**Projet :** Formation DataScientest MLOps (septembre 2025)
