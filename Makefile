@@ -7,6 +7,19 @@ YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
 
+DOCKER_COMPOSE := $(shell \
+	if docker compose version >/dev/null 2>&1; then \
+		echo "docker compose"; \
+	elif docker-compose version >/dev/null 2>&1; then \
+		echo "docker-compose"; \
+	else \
+		echo "none"; \
+	fi)
+
+ifeq ($(DOCKER_COMPOSE),none)
+$(error Docker Compose is not installed)
+endif
+
 help: ## Show this help message
 	@echo "$(BLUE)Rakuten MLOps - Makefile Commands$(NC)"
 	@echo ""
@@ -25,23 +38,23 @@ setup: ## Initial setup: copy env file and create directories
 
 start: ## Start all Docker services
 	@echo "$(BLUE)Starting Docker services...$(NC)"
-	docker-compose up -d
+	$(DOCKER_COMPOSE) up -d
 	@echo "$(GREEN)Services started!$(NC)"
 	@echo "$(YELLOW)Airflow UI: http://localhost:8080 (admin/admin)$(NC)"
 	@echo "$(YELLOW)MLflow UI: http://localhost:5000$(NC)"
 
 stop: ## Stop all Docker services
 	@echo "$(BLUE)Stopping Docker services...$(NC)"
-	docker-compose down
+	$(DOCKER_COMPOSE) down
 	@echo "$(GREEN)Services stopped!$(NC)"
 
 restart: stop start ## Restart all services
 
 ps: ## Show running containers
-	docker-compose ps
+	$(DOCKER_COMPOSE) ps
 
 logs: ## Show logs from all services
-	docker-compose logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 logs-airflow: ## Show Airflow scheduler logs
 	docker logs -f rakuten_airflow_scheduler
