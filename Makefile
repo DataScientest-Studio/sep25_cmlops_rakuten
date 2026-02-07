@@ -25,23 +25,24 @@ setup: ## Initial setup: copy env file and create directories
 
 start: ## Start all Docker services
 	@echo "$(BLUE)Starting Docker services...$(NC)"
-	docker-compose up -d
+	docker compose up -d
 	@echo "$(GREEN)Services started!$(NC)"
 	@echo "$(YELLOW)Airflow UI: http://localhost:8080 (admin/admin)$(NC)"
 	@echo "$(YELLOW)MLflow UI: http://localhost:5000$(NC)"
+	@echo "$(YELLOW)MinIO UI: http://127.0.0.1:9001$(NC)"
 
 stop: ## Stop all Docker services
 	@echo "$(BLUE)Stopping Docker services...$(NC)"
-	docker-compose down
+	docker compose down
 	@echo "$(GREEN)Services stopped!$(NC)"
 
 restart: stop start ## Restart all services
 
 ps: ## Show running containers
-	docker-compose ps
+	docker compose ps
 
 logs: ## Show logs from all services
-	docker-compose logs -f
+	docker compose logs -f
 
 logs-airflow: ## Show Airflow scheduler logs
 	docker logs -f rakuten_airflow_scheduler
@@ -90,7 +91,7 @@ clean: ## Remove all containers and volumes (WARNING: deletes data)
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose down -v; \
+		docker compose down -v; \
 		rm -rf data/training_snapshots/*; \
 		echo "$(GREEN)Cleanup complete!$(NC)"; \
 	else \
@@ -128,7 +129,7 @@ mlflow-experiments: ## List MLflow experiments
 
 rebuild: ## Rebuild all Docker images
 	@echo "$(BLUE)Rebuilding Docker images...$(NC)"
-	docker-compose build --no-cache
+	docker compose build --no-cache
 	@echo "$(GREEN)Rebuild complete!$(NC)"
 
 backup-db: ## Backup PostgreSQL database
