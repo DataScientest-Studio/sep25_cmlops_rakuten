@@ -6,7 +6,7 @@
     auth = basic
 ['remote "minio-remote"']
     url = s3://dvc-storage
-    endpointurl = http://localhost:9000
+    endpointurl = http://minio:9000
     access_key_id = minio_admin
     secret_access_key = minio_admin
     region = us-east-1

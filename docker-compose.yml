@@ -71,6 +71,32 @@ services:
         networks:
             - rakuten_network
 
+    # DVC
+    dvc:
+        image: python:3.11-slim
+        container_name: rakuten_dvc
+        working_dir: /workspace
+        environment:
+            AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio_admin}
+            AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-change_this_minio_password}
+        volumes:
+            - .:/workspace
+        command: >
+            bash -c "
+            apt-get update && apt-get install -y git &&
+            pip install dvc dvc-s3 --quiet &&
+            cd /workspace &&
+            git config --global user.email 'airflow@rakuten.local' &&
+            git config --global user.name 'Airflow Bot' &&
+            git config --global --add safe.directory /workspace &&
+            dvc remote modify minio-remote endpointurl http://minio:9000 &&
+            tail -f /dev/null
+            "
+        depends_on:
+            - minio
+        networks:
+            - rakuten_network
+
     # MLflow Tracking Server
     mlflow:
         image: ghcr.io/mlflow/mlflow:v2.10.0
@@ -167,8 +193,7 @@ services:
         ports:
             - "8080:8080"
         command: >
-            bash -c "pip install -r /requirements.txt &&
-                     airflow webserver"
+            bash -c "pip install -r /requirements.txt && airflow webserver"
         depends_on:
             postgres:
                 condition: service_healthy
@@ -191,6 +216,7 @@ services:
     airflow-scheduler:
         image: apache/airflow:2.8.0-python3.11
         container_name: rakuten_airflow_scheduler
+        user: "50000:986"
         environment:
             AIRFLOW__CORE__EXECUTOR: LocalExecutor
             AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-rakuten_user}:${POSTGRES_PASSWORD:-rakuten_pass}@postgres:5432/airflow_db
@@ -216,9 +242,9 @@ services:
             - ./data:/opt/airflow/data
             - airflow_logs:/opt/airflow/logs
             - ./requirements.txt:/requirements.txt
+            - /var/run/docker.sock:/var/run/docker.sock
         command: >
-            bash -c "pip install -r /requirements.txt &&
-                     airflow scheduler"
+            bash -c "pip install -r /requirements.txt && airflow scheduler"
         depends_on:
             postgres:
                 condition: service_healthy
@@ -238,5 +264,4 @@ networks:
 volumes:
     postgres_data:
     minio_data:
-    mlflow_artifacts:
     airflow_logs:
