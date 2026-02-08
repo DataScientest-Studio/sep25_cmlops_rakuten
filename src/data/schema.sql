@@ -68,26 +68,26 @@ DECLARE
     current_batch_id INTEGER;
 BEGIN
     -- Get the current running batch
-    SELECT id INTO current_batch_id 
-    FROM data_loads 
+    SELECT id INTO current_batch_id
+    FROM data_loads
     WHERE status = 'running'
-    ORDER BY started_at DESC 
+    ORDER BY started_at DESC
     LIMIT 1;
-    
+
     IF (TG_OP = 'INSERT') THEN
-        INSERT INTO products_history 
-        (product_id, productid, designation, description, imageid, 
+        INSERT INTO products_history
+        (product_id, productid, designation, description, imageid,
          image_path, operation_type, load_batch_id)
-        VALUES 
-        (NEW.id, NEW.productid, NEW.designation, NEW.description, 
+        VALUES
+        (NEW.id, NEW.productid, NEW.designation, NEW.description,
          NEW.imageid, NEW.image_path, 'INSERT', current_batch_id);
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
-        INSERT INTO products_history 
-        (product_id, productid, designation, description, imageid, 
+        INSERT INTO products_history
+        (product_id, productid, designation, description, imageid,
          image_path, operation_type, load_batch_id)
-        VALUES 
-        (NEW.id, NEW.productid, NEW.designation, NEW.description, 
+        VALUES
+        (NEW.id, NEW.productid, NEW.designation, NEW.description,
          NEW.imageid, NEW.image_path, 'UPDATE', current_batch_id);
         RETURN NEW;
     END IF;
@@ -102,7 +102,7 @@ FOR EACH ROW EXECUTE FUNCTION audit_products();
 
 -- Create view for easy querying of current data state
 CREATE OR REPLACE VIEW current_data_state AS
-SELECT 
+SELECT
     dl.percentage,
     dl.total_rows,
     dl.completed_at,
@@ -117,7 +117,7 @@ ORDER BY dl.completed_at DESC;
 
 -- Create view for class distribution
 CREATE OR REPLACE VIEW class_distribution AS
-SELECT 
+SELECT
     l.prdtypecode,
     COUNT(*) as count,
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentage
@@ -134,3 +134,68 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO rakuten_user;
 INSERT INTO data_loads (batch_name, percentage, total_rows, status, metadata)
 VALUES ('initial', 0, 0, 'completed', '{"note": "Initial state before any data load"}')
 ON CONFLICT (batch_name) DO NOTHING;
+
+-- raw_products : copie identique du CSV, historisée par batch
+DROP TABLE IF EXISTS raw_products CASCADE;
+
+CREATE TABLE raw_products (
+    id                      SERIAL PRIMARY KEY,
+    productid               BIGINT NOT NULL,
+    imageid                 BIGINT NOT NULL,
+    prdtypecode             INTEGER NOT NULL,
+    prodtype                VARCHAR(100) NOT NULL,
+    product_designation     TEXT NOT NULL,
+    product_description     TEXT,
+    batch_id                VARCHAR(100) NOT NULL,
+    source_file             VARCHAR(255),
+    dt_ingested             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_raw_products_productid ON raw_products(productid);
+CREATE INDEX idx_raw_products_prdtypecode ON raw_products(prdtypecode);
+CREATE INDEX idx_raw_products_batch ON raw_products(batch_id);
+
+-- processed_products : texte nettoyé (_tr), accumulé par batch
+DROP TABLE IF EXISTS processed_products CASCADE;
+
+CREATE TABLE processed_products (
+    id                      SERIAL PRIMARY KEY,
+    productid               BIGINT NOT NULL,
+    imageid                 BIGINT NOT NULL,
+    prdtypecode             INTEGER NOT NULL,
+    prodtype                VARCHAR(100) NOT NULL,
+    designation_tr          TEXT,
+    description_tr          TEXT,
+    text_tr                 TEXT,
+    path_image_minio        VARCHAR(500),
+    image_exists            BOOLEAN DEFAULT FALSE,
+    batch_id                VARCHAR(100) NOT NULL,
+    dt_processed            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_processed_productid ON processed_products(productid);
+CREATE INDEX idx_processed_prdtypecode ON processed_products(prdtypecode);
+CREATE INDEX idx_processed_batch ON processed_products(batch_id);
+
+-- Vues
+CREATE OR REPLACE VIEW v_batch_history AS
+SELECT
+    batch_id,
+    COUNT(*) AS nb_products,
+    COUNT(DISTINCT prdtypecode) AS nb_categories,
+    MIN(dt_ingested) AS dt_ingested
+FROM raw_products
+GROUP BY batch_id
+ORDER BY dt_ingested DESC;
+
+CREATE OR REPLACE VIEW v_category_summary AS
+SELECT
+    prdtypecode,
+    prodtype,
+    COUNT(*) AS total_products,
+    COUNT(CASE WHEN description_tr IS NOT NULL
+               AND description_tr != '' THEN 1 END) AS with_description,
+    COUNT(CASE WHEN image_exists THEN 1 END) AS with_image
+FROM processed_products
+GROUP BY prdtypecode, prodtype
+ORDER BY total_products DESC;

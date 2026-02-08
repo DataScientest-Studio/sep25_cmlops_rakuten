@@ -75,6 +75,4 @@ s3transfer==0.10.2
 # Airflow S3 Provider (pour S3KeySensor + S3Hook)
 apache-airflow-providers-amazon==8.16.0
 
-# DVC
-dvc==3.55.2
-dvc-s3==3.2.0
+docker>=6.0
