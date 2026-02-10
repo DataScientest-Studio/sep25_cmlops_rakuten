@@ -11,8 +11,8 @@ import sys
 import os
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, '/opt/airflow/src')
+# Add project root to path
+sys.path.insert(0, '/opt/airflow')
 
 # Default arguments for the DAG
 default_args = {

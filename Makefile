@@ -55,30 +55,30 @@ logs-postgres: ## Show PostgreSQL logs
 
 init-db: ## Initialize database with 40% of data
 	@echo "$(BLUE)Initializing database...$(NC)"
-	docker exec -it rakuten_airflow_webserver bash -c "pip install -r /requirements.txt && python /opt/airflow/src/data/db_init.py"
+	docker exec rakuten_airflow_webserver bash -c "pip install -r /requirements.txt && python /opt/airflow/src/data/db_init.py"
 	@echo "$(GREEN)Database initialized!$(NC)"
 
 status: ## Show current data loading status
 	@echo "$(BLUE)Checking current status...$(NC)"
-	docker exec -it rakuten_airflow_webserver python /opt/airflow/src/data/loader.py --status
+	docker exec rakuten_airflow_webserver python /opt/airflow/src/data/loader.py --status
 
 history: ## Show data loading history
 	@echo "$(BLUE)Loading history...$(NC)"
-	docker exec -it rakuten_airflow_webserver python /opt/airflow/src/data/loader.py --history
+	docker exec rakuten_airflow_webserver python /opt/airflow/src/data/loader.py --history
 
 load-data: ## Load next increment of data (3%)
 	@echo "$(BLUE)Loading next data increment...$(NC)"
-	docker exec -it rakuten_airflow_webserver python /opt/airflow/src/data/loader.py
+	docker exec rakuten_airflow_webserver python /opt/airflow/src/data/loader.py
 	@echo "$(GREEN)Data loaded!$(NC)"
 
 generate-dataset: ## Generate balanced dataset
 	@echo "$(BLUE)Generating balanced dataset...$(NC)"
-	docker exec -it rakuten_airflow_webserver python /opt/airflow/src/data/dataset_generator.py
+	docker exec rakuten_airflow_webserver python /opt/airflow/src/data/dataset_generator.py
 	@echo "$(GREEN)Dataset generated!$(NC)"
 
 test-config: ## Test configuration
 	@echo "$(BLUE)Testing configuration...$(NC)"
-	docker exec -it rakuten_airflow_webserver python /opt/airflow/src/config.py
+	docker exec rakuten_airflow_webserver python /opt/airflow/src/config.py
 
 shell-airflow: ## Open shell in Airflow container
 	docker exec -it rakuten_airflow_webserver bash
@@ -114,18 +114,18 @@ check-health: ## Check health of all services
 
 trigger-dag: ## Manually trigger the weekly ML pipeline DAG
 	@echo "$(BLUE)Triggering DAG...$(NC)"
-	docker exec -it rakuten_airflow_webserver airflow dags trigger weekly_ml_pipeline
+	docker exec rakuten_airflow_webserver airflow dags trigger weekly_ml_pipeline
 	@echo "$(GREEN)DAG triggered!$(NC)"
 
 list-dags: ## List all Airflow DAGs
-	docker exec -it rakuten_airflow_webserver airflow dags list
+	docker exec rakuten_airflow_webserver airflow dags list
 
 dag-errors: ## Show DAG import errors
-	docker exec -it rakuten_airflow_webserver airflow dags list-import-errors
+	docker exec rakuten_airflow_webserver airflow dags list-import-errors
 
 mlflow-experiments: ## List MLflow experiments
 	@echo "$(BLUE)MLflow Experiments:$(NC)"
-	docker exec -it rakuten_airflow_webserver mlflow experiments list --tracking-uri http://mlflow:5000
+	docker exec rakuten_airflow_webserver mlflow experiments list --tracking-uri http://mlflow:5000
 
 rebuild: ## Rebuild all Docker images
 	@echo "$(BLUE)Rebuilding Docker images...$(NC)"
