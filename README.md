@@ -19,7 +19,7 @@ Pipeline de données incrémentales : PostgreSQL + MLflow + Airflow
 # Configuration initiale
 make setup
 
-# Démarrer l'infrastructure (PostgreSQL, MLflow, Airflow)
+# Démarrer l'infrastructure (PostgreSQL, MLflow, MinIO, Airflow)
 make start
 
 # Vérifier que les services sont actifs
@@ -29,6 +29,7 @@ make ps
 **Services :**
 - Airflow UI : http://localhost:8080 (admin/admin)
 - MLflow UI : http://localhost:5000
+- MinIO UI : http://127.0.0.1:9001 (minio_admin/minio_password)
 - PostgreSQL : localhost:5432
 
 ### 2. Initialiser les Données (40%)
@@ -118,12 +119,8 @@ SELECT * FROM data_loads ORDER BY completed_at DESC;  # Historique
 ## 📊 MLflow
 
 **UI :** http://localhost:5000  
-**Experiments :** `rakuten_dataset_versioning`, `rakuten_model_training`
-
-```bash
-# Voir les experiments depuis Airflow
-docker exec rakuten_airflow_webserver mlflow experiments list --tracking-uri http://mlflow:5000
-```
+**Experiments :** `rakuten_dataset_versioning`, `rakuten_model_training`  
+**Artifacts :** Stockés dans MinIO (S3-compatible)
 
 ---
 
@@ -156,7 +153,7 @@ make start && make init-db
 ## 📚 Documentation
 
 - [Architecture détaillée](docs/ARCHITECTURE_PLAN.md) - Plan complet du pipeline
-- [Résultats des tests](TEST_RESULTS.md) - Tests effectués et validés
+- [Rapport de tests](TEST_REPORT_2026-02-10.md) - Tests complets et validés
 - [Schéma DB](src/data/schema.sql) - Structure PostgreSQL
 
 **Projet :** Formation DataScientest MLOps (septembre 2025)

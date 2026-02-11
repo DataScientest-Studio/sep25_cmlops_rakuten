@@ -14,9 +14,9 @@ sqlalchemy==1.4.50
 mlflow==2.10.2
 
 # Machine Learning
-scikit-learn==1.7.2
-scipy==1.16.3
-imbalanced-learn==0.12.0
+scikit-learn==1.5.2
+scipy==1.14.1
+imbalanced-learn==0.12.4
 
 # Image Processing
 pillow==11.0.0
