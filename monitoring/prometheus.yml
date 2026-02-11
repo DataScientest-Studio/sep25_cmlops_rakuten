@@ -1,0 +1,26 @@
+# Prometheus Configuration for Rakuten MLOps
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'rakuten-mlops'
+
+scrape_configs:
+  # Rakuten FastAPI service
+  - job_name: 'rakuten-api'
+    static_configs:
+      - targets: ['api:8000']
+        labels:
+          service: 'rakuten-api'
+          environment: 'production'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
