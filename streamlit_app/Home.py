@@ -1,26 +1,14 @@
 """
-Rakuten MLOps Control Room - Home Page
+Rakuten MLOps Pipeline - Home & Presentation
 
-Main entry point for the Streamlit MLOps monitoring application.
+Welcome page with project overview and pipeline explanation.
 """
 import streamlit as st
-import sys
 from pathlib import Path
-
-# Add project root to path (parent of streamlit_app)
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-# Add streamlit_app to path for local imports
-streamlit_app_root = Path(__file__).parent
-sys.path.insert(0, str(streamlit_app_root))
-
-from managers.docker_manager import docker_manager
-from components.docker_status import render_docker_status
 
 # Page configuration
 st.set_page_config(
-    page_title="Rakuten MLOps Control Room",
+    page_title="Rakuten MLOps - Home",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -42,123 +30,192 @@ st.markdown("""
         color: #666;
         margin-bottom: 2rem;
     }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        text-align: center;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 # Main content
-st.markdown('<div class="main-header">🎯 Rakuten MLOps Control Room</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Monitor and control your ML pipeline</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🎯 Rakuten MLOps Pipeline</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Product Classification - MLOps Certification Project</div>', unsafe_allow_html=True)
 
-# System overview
-st.header("📊 System Overview")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric(
-        label="🗄️ Database",
-        value="PostgreSQL",
-        delta="Active"
-    )
-
-with col2:
-    st.metric(
-        label="🔬 Experiment Tracking",
-        value="MLflow",
-        delta="Active"
-    )
-
-with col3:
-    st.metric(
-        label="🚀 API Server",
-        value="FastAPI",
-        delta="Ready"
-    )
-
-with col4:
-    st.metric(
-        label="📈 Monitoring",
-        value="Prometheus + Grafana",
-        delta="Active"
-    )
-
-# Docker status
-render_docker_status(docker_manager, show_all=True)
-
-# Description
-st.header("📖 About")
+# Project Overview
+st.header("📖 Project Overview")
 
 st.markdown("""
-This control room provides a centralized interface for monitoring and managing the Rakuten product classification MLOps pipeline.
+This project demonstrates a **complete MLOps pipeline** for product classification using:
+- Incremental data loading (40% → 100%)
+- Experiment tracking with MLflow
+- Model versioning and promotion
+- REST API serving with monitoring
+- Drift detection and observability
 
-**Key Features:**
-- 📊 **Database Pipeline**: Monitor data ingestion, view class distribution, and track data loads
-- 🔄 **Ingestion & Training**: Track MLflow experiments, view training metrics, and manage model artifacts
-- 🚀 **Model Promotion**: Promote models between stages and test predictions via the API
-- 📈 **Drift & Monitoring**: Monitor model performance, check system health, and view inference logs
-
-**Architecture:**
-- Data stored in PostgreSQL database with incremental loading
-- MLflow for experiment tracking and model registry
-- FastAPI for model serving with health monitoring
-- Prometheus & Grafana for metrics and visualization
+**Goal**: Classify Rakuten products into 27 categories using text data (designation + description)
 """)
 
-# Quick links
-st.header("🔗 Quick Links")
+# Pipeline Architecture
+st.header("🏗️ Pipeline Architecture")
 
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("📄 Pages")
-    st.page_link("pages/1_📊_Database_Pipeline.py", label="📊 Database Pipeline", icon="1️⃣")
-    st.page_link("pages/2_🔄_Ingestion_Training.py", label="🔄 Ingestion & Training", icon="2️⃣")
-    st.page_link("pages/3_🚀_Model_Promotion.py", label="🚀 Model Promotion", icon="3️⃣")
-    st.page_link("pages/4_📈_Drift_Monitoring.py", label="📈 Drift & Monitoring", icon="4️⃣")
+    st.markdown("""
+    ### Core Components
+    
+    **1. Data Storage**
+    - PostgreSQL with audit trail
+    - Tracks all data changes
+    - Enables reproducibility
+    
+    **2. Experiment Tracking**
+    - MLflow for runs & metrics
+    - Model registry
+    - Artifact storage (MinIO)
+    
+    **3. Model Serving**
+    - FastAPI REST API
+    - Automatic model reloading
+    - Health monitoring
+    
+    **4. Observability**
+    - Prometheus metrics
+    - Grafana dashboards
+    - Inference logging
+    """)
 
 with col2:
-    st.subheader("🌐 External Services")
-    st.markdown("- [MLflow UI](http://localhost:5000) - Experiment tracking")
-    st.markdown("- [Airflow UI](http://localhost:8080) - Pipeline orchestration")
-    st.markdown("- [API Docs](http://localhost:8000/docs) - FastAPI Swagger")
-    st.markdown("- [Grafana](http://localhost:3000) - Monitoring dashboards")
-    st.markdown("- [Prometheus](http://localhost:9090) - Metrics collection")
+    st.markdown("""
+    ### Pipeline Flow
+    
+    ```
+    1️⃣ Data Pipeline
+       ↓ Load incremental data
+       ↓ Track in database audit trail
+    
+    2️⃣ Training Pipeline
+       ↓ Generate balanced dataset
+       ↓ Train TF-IDF + LogisticRegression
+       ↓ Log to MLflow
+    
+    3️⃣ Model Registry
+       ↓ Register model version
+       ↓ Promote to Production
+    
+    4️⃣ Serving
+       ↓ API loads Production model
+       ↓ Serve predictions
+       ↓ Log inferences
+    
+    5️⃣ Monitoring
+       ↓ Collect metrics
+       ↓ Detect drift
+       ↓ Alert if needed
+    ```
+    """)
 
-# System health summary
-st.header("🏥 System Health Summary")
+# Key Features
+st.header("✨ Key MLOps Capabilities")
 
-try:
-    services_health = docker_manager.get_service_health()
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("""
+    ### 📊 Data Versioning
+    - Database audit trail
+    - Batch tracking
+    - Timestamp-based reproducibility
+    - No external tools needed
+    """)
+
+with col2:
+    st.markdown("""
+    ### 🔬 Experiment Tracking
+    - All hyperparameters logged
+    - Metrics & artifacts stored
+    - Model lineage
+    - Easy comparison
+    """)
+
+with col3:
+    st.markdown("""
+    ### 🚀 Production Ready
+    - Stage-based promotion
+    - Health checks
+    - Automated reloading
+    - Monitoring & alerting
+    """)
+
+# Versioning Strategy
+st.header("🔄 Reproducibility Strategy")
+
+st.info("""
+**How we ensure reproducibility without DVC:**
+
+1. **Data Versioning**: PostgreSQL `data_loads` and `products_history` tables track every data change with timestamps
+2. **Experiment Tracking**: MLflow logs all parameters, metrics, and artifacts for every training run
+3. **Model Registry**: Each model version links back to its training run and data version
+
+**To reproduce any training**: Given an MLflow run_id, we can query the database for the exact data state at that time, 
+retrieve all hyperparameters from MLflow, and retrain with identical setup.
+""")
+
+# Navigation
+st.header("🗺️ Demo Navigation")
+
+st.markdown("""
+Use the sidebar to navigate through the pipeline stages:
+
+- **Page 1**: 🏠 This overview
+- **Page 2**: 🗄️ Data & Infrastructure - Docker status, database state, data evolution
+- **Page 3**: 🔄 Training - Dataset generation, model training, experiment tracking  
+- **Page 4**: 🚀 Promotion - Model registry, promotion, and prediction testing
+- **Page 5**: 📈 Monitoring - Drift detection, system health, inference logs
+
+Each page represents a stage in the MLOps lifecycle.
+""")
+
+# Quick Links
+st.header("🔗 External Services")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("### MLflow UI")
+    st.markdown("http://localhost:5000")
+    st.caption("Experiment tracking & model registry")
+
+with col2:
+    st.markdown("### API Documentation")
+    st.markdown("http://localhost:8000/docs")
+    st.caption("FastAPI Swagger UI")
+
+with col3:
+    st.markdown("### Grafana Dashboards")
+    st.markdown("http://localhost:3000")
+    st.caption("Monitoring & visualization")
+
+# Technical Details
+with st.expander("🔧 Technical Stack"):
+    st.markdown("""
+    **Infrastructure**:
+    - PostgreSQL 15 (database with audit trail)
+    - MinIO (S3-compatible object storage)
+    - MLflow 2.10 (experiment tracking)
+    - FastAPI (model serving)
+    - Prometheus + Grafana (monitoring)
     
-    healthy_count = sum(1 for s in services_health.values() if s["status"] == "healthy")
-    total_count = len(services_health)
+    **ML Stack**:
+    - scikit-learn (TF-IDF + LogisticRegression)
+    - imbalanced-learn (data balancing)
+    - pandas (data processing)
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Services Running", f"{healthy_count}/{total_count}")
-    
-    with col2:
-        health_percentage = (healthy_count / total_count * 100) if total_count > 0 else 0
-        st.metric("System Health", f"{health_percentage:.0f}%")
-    
-    with col3:
-        overall_status = "🟢 Healthy" if healthy_count == total_count else "🟡 Degraded" if healthy_count > 0 else "🔴 Down"
-        st.metric("Overall Status", overall_status)
-    
-except Exception as e:
-    st.error(f"❌ Could not get system health: {e}")
+    **Deployment**:
+    - Docker Compose (container orchestration)
+    - Streamlit (control room UI)
+    """)
 
 # Footer
 st.markdown("---")
 st.markdown("""
     <div style="text-align: center; color: #666;">
-        <small>Rakuten MLOps Control Room v1.0 | Built with Streamlit</small>
+        <small>DataScientest MLOps Certification - September 2025</small>
     </div>
     """, unsafe_allow_html=True)

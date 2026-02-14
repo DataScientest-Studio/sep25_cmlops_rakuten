@@ -41,11 +41,12 @@ class DockerManager:
                 "container": "rakuten_mlflow",
                 "expected_port": 5000,
             },
-            "Airflow": {
-                "url": "http://localhost:8080/health",
-                "container": "rakuten_airflow_webserver",
-                "expected_port": 8080,
-            },
+            # Airflow removed - using simplified stack
+            # "Airflow": {
+            #     "url": "http://localhost:8080/health",
+            #     "container": "rakuten_airflow_webserver",
+            #     "expected_port": 8080,
+            # },
             "API": {
                 "url": "http://localhost:8000/health",
                 "container": "rakuten_api",
