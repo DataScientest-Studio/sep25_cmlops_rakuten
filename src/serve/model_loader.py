@@ -9,8 +9,8 @@ from mlflow.tracking import MlflowClient
 import time
 import logging
 from typing import Optional, Tuple, Any
-from . import config
-from .metrics import update_model_metrics
+import config
+from metrics import update_model_metrics
 
 logger = logging.getLogger(__name__)
 

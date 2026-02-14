@@ -17,7 +17,7 @@ import os
 import pandas as pd
 import logging
 import argparse
-from sqlalchemy import create_engine
+import psycopg2
 
 # Configure logging
 logging.basicConfig(
@@ -38,13 +38,6 @@ def load_data_from_database():
     postgres_user = os.getenv("POSTGRES_USER", "rakuten_user")
     postgres_password = os.getenv("POSTGRES_PASSWORD", "rakuten_pass")
 
-    connection_string = (
-        f"postgresql://{postgres_user}:{postgres_password}@"
-        f"{postgres_host}:{postgres_port}/{postgres_db}"
-    )
-
-    engine = create_engine(connection_string)
-
     # Load products and labels
     query = """
     SELECT 
@@ -59,8 +52,18 @@ def load_data_from_database():
     ORDER BY p.productid
     """
 
-    df = pd.read_sql(query, engine)
-    engine.dispose()
+    # Use psycopg2 directly to avoid SQLAlchemy compatibility issues
+    conn = psycopg2.connect(
+        host=postgres_host,
+        port=postgres_port,
+        database=postgres_db,
+        user=postgres_user,
+        password=postgres_password
+    )
+    try:
+        df = pd.read_sql_query(query, conn)
+    finally:
+        conn.close()
 
     logger.info(f"Loaded {len(df)} samples from database")
     logger.info(f"Classes: {df['prdtypecode'].nunique()}")

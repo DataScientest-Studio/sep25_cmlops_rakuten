@@ -10,13 +10,12 @@ import mlflow
 import numpy as np
 from datetime import datetime
 import logging
-from typing import Dict
 
-from .schemas import PredictionRequest, PredictionResponse, HealthResponse
-from .model_loader import model_loader
-from .inference_logger import inference_logger
-from .metrics import track_prediction_latency, record_prediction
-from . import config
+from schemas import PredictionRequest, PredictionResponse, HealthResponse
+from model_loader import model_loader
+from inference_logger import inference_logger
+from metrics import track_prediction_latency, record_prediction
+import config
 
 # Add parent directory to path for src imports
 import sys

@@ -12,7 +12,7 @@ from pathlib import Path
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.utils.text_preprocessing import preprocess_text
+from src.utils.text_preprocessing import clean_text, input_text_train, input_text_infer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -123,8 +123,8 @@ class TextFeatureExtractor:
             description = str(row.get("description", ""))
 
             # Preprocess each field
-            designation_clean = preprocess_text(designation)
-            description_clean = preprocess_text(description)
+            designation_clean = clean_text(designation)
+            description_clean = clean_text(description)
 
             # Combine with space
             combined = f"{designation_clean} {description_clean}"

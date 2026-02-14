@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 
-from . import config
-from .routes import router
+import config
+from routes import router
 
 # Configure logging
 logging.basicConfig(
