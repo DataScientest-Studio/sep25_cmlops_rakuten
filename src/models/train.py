@@ -27,7 +27,7 @@ from src.models.evaluate import (
     plot_confusion_matrix,
     plot_class_distribution,
 )
-from src.models.model_registry import register_model, promote_model
+from src.models.model_registry import register_model, promote_model, auto_promote_if_better
 
 # Configure logging
 logging.basicConfig(
@@ -288,16 +288,24 @@ def train_model(
                 version = register_model(run_id, model_name="rakuten_classifier")
                 logger.info(f"Model registered: version {version}")
 
-                # Promote to Production if requested and metrics are good
-                if auto_promote and test_metrics["f1_weighted"] > 0.70:
-                    logger.info("Auto-promoting model to Production...")
-                    promote_model("rakuten_classifier", version, stage="Production")
-                    logger.info("Model promoted to Production")
-                elif auto_promote:
-                    logger.warning(
-                        f"Model F1 ({test_metrics['f1_weighted']:.4f}) below threshold (0.70), "
-                        "not promoting to Production"
+                # Auto-promote based on performance comparison
+                if auto_promote:
+                    logger.info("Evaluating model for auto-promotion...")
+                    promotion_result = auto_promote_if_better(
+                        model_name="rakuten_classifier",
+                        new_version=version,
+                        new_f1_score=test_metrics["f1_weighted"],
+                        min_f1_threshold=0.70,
                     )
+                    
+                    # Log promotion decision
+                    if promotion_result["promoted"]:
+                        logger.info(f"✅ Model promoted to Production!")
+                        logger.info(f"   Reason: {promotion_result['reason']}")
+                    else:
+                        logger.info(f"📦 Model archived")
+                        logger.info(f"   Reason: {promotion_result['reason']}")
+                        
             except Exception as e:
                 logger.error(f"Failed to register/promote model: {e}")
 

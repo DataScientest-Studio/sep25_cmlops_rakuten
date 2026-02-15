@@ -5,6 +5,12 @@ Welcome page with project overview and pipeline explanation.
 """
 import streamlit as st
 from pathlib import Path
+import sys
+
+# Load environment variables
+sys.path.insert(0, str(Path(__file__).parent))
+from utils.env_config import load_env_vars
+load_env_vars()
 
 # Page configuration
 st.set_page_config(
@@ -34,11 +40,13 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # Main content
-st.markdown('<div class="main-header">🎯 Rakuten MLOps Pipeline</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">Rakuten MLOps Pipeline</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">Product Classification - MLOps Certification Project</div>', unsafe_allow_html=True)
 
+st.markdown("<br>", unsafe_allow_html=True)
+
 # Project Overview
-st.header("📖 Project Overview")
+st.header("Project Overview")
 
 st.markdown("""
 This project demonstrates a **complete MLOps pipeline** for product classification using:
@@ -51,8 +59,10 @@ This project demonstrates a **complete MLOps pipeline** for product classificati
 **Goal**: Classify Rakuten products into 27 categories using text data (designation + description)
 """)
 
+st.markdown("<br>", unsafe_allow_html=True)
+
 # Pipeline Architecture
-st.header("🏗️ Pipeline Architecture")
+st.header("Pipeline Architecture")
 
 col1, col2 = st.columns([1, 1])
 
@@ -111,14 +121,16 @@ with col2:
     ```
     """)
 
+st.markdown("<br>", unsafe_allow_html=True)
+
 # Key Features
-st.header("✨ Key MLOps Capabilities")
+st.header("Key MLOps Capabilities")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("""
-    ### 📊 Data Versioning
+    ### Data Versioning
     - Database audit trail
     - Batch tracking
     - Timestamp-based reproducibility
@@ -127,7 +139,7 @@ with col1:
 
 with col2:
     st.markdown("""
-    ### 🔬 Experiment Tracking
+    ### Experiment Tracking
     - All hyperparameters logged
     - Metrics & artifacts stored
     - Model lineage
@@ -136,15 +148,17 @@ with col2:
 
 with col3:
     st.markdown("""
-    ### 🚀 Production Ready
+    ### Production Ready
     - Stage-based promotion
     - Health checks
     - Automated reloading
     - Monitoring & alerting
     """)
 
+st.markdown("<br>", unsafe_allow_html=True)
+
 # Versioning Strategy
-st.header("🔄 Reproducibility Strategy")
+st.header("Reproducibility Strategy")
 
 st.info("""
 **How we ensure reproducibility without DVC:**
@@ -157,23 +171,10 @@ st.info("""
 retrieve all hyperparameters from MLflow, and retrain with identical setup.
 """)
 
-# Navigation
-st.header("🗺️ Demo Navigation")
-
-st.markdown("""
-Use the sidebar to navigate through the pipeline stages:
-
-- **Page 1**: 🏠 This overview
-- **Page 2**: 🗄️ Data & Infrastructure - Docker status, database state, data evolution
-- **Page 3**: 🔄 Training - Dataset generation, model training, experiment tracking  
-- **Page 4**: 🚀 Promotion - Model registry, promotion, and prediction testing
-- **Page 5**: 📈 Monitoring - Drift detection, system health, inference logs
-
-Each page represents a stage in the MLOps lifecycle.
-""")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # Quick Links
-st.header("🔗 External Services")
+st.header("External Services")
 
 col1, col2, col3 = st.columns(3)
 
@@ -192,8 +193,10 @@ with col3:
     st.markdown("http://localhost:3000")
     st.caption("Monitoring & visualization")
 
+st.markdown("<br>", unsafe_allow_html=True)
+
 # Technical Details
-with st.expander("🔧 Technical Stack"):
+with st.expander("Technical Stack"):
     st.markdown("""
     **Infrastructure**:
     - PostgreSQL 15 (database with audit trail)

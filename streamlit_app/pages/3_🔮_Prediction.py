@@ -1,7 +1,7 @@
 """
-Model Promotion & Predictions
+Model Registry & Predictions
 
-Model registry, promotion workflow, and prediction testing.
+Model registry overview, prediction testing, and API information.
 """
 import streamlit as st
 import sys
@@ -21,16 +21,14 @@ sys.path.insert(0, str(project_root))
 streamlit_app_root = Path(__file__).parent.parent
 sys.path.insert(0, str(streamlit_app_root))
 
-from managers.pipeline_executor import promote_model
-
 # Page configuration
 st.set_page_config(
-    page_title="Promotion - Rakuten MLOps",
-    page_icon="🚀",
+    page_title="Prediction - Rakuten MLOps",
+    page_icon="🔮",
     layout="wide"
 )
 
-st.title("🚀 Model Promotion & Predictions")
+st.title("Prediction & Model Registry")
 
 # Configuration
 MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
@@ -52,7 +50,7 @@ client = get_mlflow_client()
 # Refresh button
 col1, col2 = st.columns([6, 1])
 with col2:
-    if st.button("🔄 Refresh", use_container_width=True):
+    if st.button("Refresh", use_container_width=True):
         st.cache_resource.clear()
         st.cache_data.clear()
         st.rerun()
@@ -63,11 +61,7 @@ with col2:
 st.header("1️⃣ Model Registry")
 
 st.markdown("""
-View all registered models and their versions. Models can be in different stages:
-- **None**: Just registered, not promoted yet
-- **Staging**: Ready for testing
-- **Production**: Actively serving predictions
-- **Archived**: Deprecated versions
+View all registered models and their versions. Models are automatically managed based on performance.
 """)
 
 if client:
@@ -76,7 +70,7 @@ if client:
         
         if registered_models:
             for model in registered_models:
-                with st.expander(f"📦 Model: **{model.name}**", expanded=True):
+                with st.expander(f"Model: **{model.name}**", expanded=True):
                     
                     # Get all versions
                     versions = client.search_model_versions(f"name='{model.name}'")
@@ -116,136 +110,22 @@ if client:
                     else:
                         st.info("No versions for this model yet")
         else:
-            st.info("📭 No registered models yet. Train and register a model first!")
-            st.caption("💡 Go to Training page and train a model with auto-register enabled")
+            st.info("No registered models yet. Train and register a model first!")
+            st.caption("Go to Training page and train a model with auto-register enabled")
     
     except Exception as e:
         st.error(f"❌ Error fetching models: {e}")
 
 else:
     st.error("❌ MLflow connection required")
-    st.info(f"💡 Make sure MLflow is running at {MLFLOW_URI}")
+    st.info(f"Make sure MLflow is running at {MLFLOW_URI}")
 
 st.markdown("---")
 
 # =============================================================================
-# SECTION 2: MODEL PROMOTION
+# SECTION 2: TEST PREDICTIONS
 # =============================================================================
-st.header("2️⃣ Promote Model")
-
-st.markdown("""
-Promote a model version to a specific stage. Typically:
-1. Train model → Registered as version N
-2. Promote to **Staging** for testing
-3. After validation, promote to **Production**
-""")
-
-if client:
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        model_name = st.text_input(
-            "Model Name",
-            value="rakuten_classifier",
-            help="Name of the model to promote"
-        )
-        
-        version = st.number_input(
-            "Version",
-            min_value=1,
-            value=1,
-            help="Version number to promote"
-        )
-    
-    with col2:
-        target_stage = st.selectbox(
-            "Target Stage",
-            options=["Staging", "Production", "Archived"],
-            help="Stage to promote the model to"
-        )
-        
-        archive_existing = st.checkbox(
-            "Archive existing models in target stage",
-            value=True,
-            help="Move current models to Archived"
-        )
-    
-    if st.button("🚀 Promote Model", type="primary", use_container_width=True):
-        with st.spinner(f"Promoting {model_name} v{version} to {target_stage}..."):
-            result = promote_model(
-                model_name=model_name,
-                version=version,
-                stage=target_stage,
-                archive_existing=archive_existing
-            )
-            
-            if result['success']:
-                st.success(f"✅ {result['message']}")
-                st.balloons()
-                st.cache_data.clear()
-                st.cache_resource.clear()
-                st.rerun()
-            else:
-                st.error(f"❌ {result['message']}")
-
-else:
-    st.warning("⚠️ MLflow connection required for promotion")
-
-st.markdown("---")
-
-# =============================================================================
-# SECTION 3: API STATUS
-# =============================================================================
-st.header("3️⃣ API Service Status")
-
-try:
-    response = requests.get(f"{API_URL}/health", timeout=5)
-    
-    if response.status_code == 200:
-        health = response.json()
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            status = health.get("status", "unknown")
-            if status == "healthy":
-                st.success(f"**Status**\n\n✅ {status}")
-            else:
-                st.warning(f"**Status**\n\n⚠️ {status}")
-        
-        with col2:
-            model_loaded = health.get("model_loaded", False)
-            if model_loaded:
-                st.success(f"**Model**\n\n✅ Loaded")
-            else:
-                st.error(f"**Model**\n\n❌ Not Loaded")
-        
-        with col3:
-            model_version = health.get("model_version", "N/A")
-            st.info(f"**Version**\n\n{model_version}")
-        
-        with col4:
-            model_stage = health.get("model_stage", "N/A")
-            st.info(f"**Stage**\n\n{model_stage}")
-        
-        with st.expander("📋 Full Health Response"):
-            st.json(health)
-    
-    else:
-        st.error(f"❌ API returned status {response.status_code}")
-
-except requests.exceptions.ConnectionError:
-    st.error("❌ API is not reachable")
-    st.info(f"💡 Make sure the API is running: `docker compose ps api`")
-except Exception as e:
-    st.error(f"❌ Health check failed: {e}")
-
-st.markdown("---")
-
-# =============================================================================
-# SECTION 4: PREDICTION TESTING
-# =============================================================================
-st.header("4️⃣ Test Predictions")
+st.header("2️⃣ Test Predictions")
 
 st.markdown("""
 Test the deployed model by sending prediction requests to the API.
@@ -282,7 +162,7 @@ else:
     designation = st.text_input("Designation", value="")
     description = st.text_area("Description", value="", height=100)
 
-if st.button("🔮 Predict", type="primary", disabled=(not designation or not description)):
+if st.button("Predict", type="primary", disabled=(not designation or not description)):
     
     payload = {
         "designation": designation,
@@ -314,7 +194,7 @@ if st.button("🔮 Predict", type="primary", disabled=(not designation or not de
             
             # Show top probabilities
             if "probabilities" in result:
-                st.subheader("🎯 Top 5 Class Probabilities")
+                st.subheader("Top 5 Class Probabilities")
                 
                 probs = result["probabilities"]
                 top_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:5]
@@ -338,16 +218,26 @@ if st.button("🔮 Predict", type="primary", disabled=(not designation or not de
     except Exception as e:
         st.error(f"❌ Prediction failed: {e}")
 
-# API Info
 st.markdown("---")
+
+# =============================================================================
+# SECTION 3: API INFORMATION
+# =============================================================================
+st.header("3️⃣ API Information")
+
 st.info(f"""
-**API Information:**
+**API Endpoints:**
 - Base URL: {API_URL}
 - Health: {API_URL}/health
 - Predict: {API_URL}/predict
-- Docs: {API_URL}/docs
+- Documentation: {API_URL}/docs
+""")
+
+st.markdown("""
+The API serves the current Production model from the MLflow registry. 
+All predictions are logged for monitoring and drift detection.
 """)
 
 # Footer
 st.markdown("---")
-st.caption(f"💡 API serves Production model from MLflow registry")
+st.caption("The API automatically reloads when a new model is promoted to Production")

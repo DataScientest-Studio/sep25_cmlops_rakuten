@@ -133,9 +133,9 @@ class ModelLoader:
                 # Try to load vectorizer from artifacts
                 if run_id:
                     try:
-                        artifact_uri = f"runs:/{run_id}/vectorizer.pkl"
                         import pickle
-                        import mlflow.artifacts
+                        
+                        artifact_uri = f"runs:/{run_id}/vectorizer.pkl"
                         
                         # Download artifact
                         local_path = mlflow.artifacts.download_artifacts(artifact_uri)

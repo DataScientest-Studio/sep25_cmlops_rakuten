@@ -1,0 +1,53 @@
+# Prefect Deployment Configuration
+# Deploy with: prefect deploy --all
+
+name: rakuten-mlops
+version: 1.0.0
+
+# Work pool (uses default)
+work_pool:
+  name: default
+
+# Deployments
+deployments:
+  # Training Pipeline (manual trigger)
+  - name: training-pipeline
+    version: 1.0.0
+    entrypoint: flows/pipeline_flow.py:training_pipeline
+    description: "Rakuten model training pipeline with MLflow integration"
+    tags:
+      - training
+      - ml
+      - rakuten
+    parameters:
+      dataset_run_id: null
+      week_number: null
+      max_features: 5000
+      C: 1.0
+      auto_promote_threshold: 0.75
+    work_pool:
+      name: default
+
+  # Monitoring and Retraining Flow (daily schedule)
+  - name: monitor-and-retrain
+    version: 1.0.0
+    entrypoint: flows/monitor_and_retrain.py:monitor_and_retrain
+    description: "Daily drift monitoring with automatic retraining"
+    tags:
+      - monitoring
+      - drift
+      - rakuten
+    schedule:
+      cron: "0 9 * * *"  # Daily at 09:00 UTC
+      timezone: UTC
+    parameters:
+      inference_log_path: null  # Uses default from config
+      force_retrain: false
+    work_pool:
+      name: default
+
+# Pull configuration (for code syncing)
+pull:
+  - prefect.deployments.steps.git_clone:
+      repository: https://github.com/DataScientest-Studio/sep25_cmlops_rakuten
+      branch: fix/universal-pipeline-improvements

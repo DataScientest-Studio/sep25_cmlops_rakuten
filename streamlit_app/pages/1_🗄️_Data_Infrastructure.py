@@ -22,6 +22,7 @@ sys.path.insert(0, str(streamlit_app_root))
 
 from managers.docker_manager import docker_manager
 from managers.pipeline_executor import run_data_loader, get_data_status
+from utils.env_config import get_db_config
 
 # Page configuration
 st.set_page_config(
@@ -30,7 +31,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🗄️ Data & Infrastructure Status")
+st.title("Data & Infrastructure Status")
 
 # =============================================================================
 # SECTION 1: DOCKER SERVICES STATUS
@@ -58,7 +59,7 @@ try:
 
 except Exception as e:
     st.error(f"❌ Could not check Docker services: {e}")
-    st.info("💡 Make sure Docker services are running: `make start`")
+    st.info("Make sure Docker services are running: `make start`")
 
 st.markdown("---")
 
@@ -68,13 +69,8 @@ st.markdown("---")
 st.header("2️⃣ Database Status")
 
 # Database connection config
-DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST', 'localhost'),
-    'port': os.getenv('POSTGRES_PORT', '5432'),
-    'database': os.getenv('POSTGRES_DB', 'rakuten_db'),
-    'user': os.getenv('POSTGRES_USER', 'rakuten_user'),
-    'password': os.getenv('POSTGRES_PASSWORD', 'rakuten_pass')
-}
+# Automatically loads from .env file and st.secrets
+DB_CONFIG = get_db_config()
 
 @st.cache_data(ttl=30)
 def get_database_stats():
@@ -137,11 +133,11 @@ if stats:
     # Progress bar
     progress = stats['current_percentage'] / 100
     st.progress(progress)
-    st.caption(f"🕐 Last updated: {stats['last_load_date'].strftime('%Y-%m-%d %H:%M') if stats['last_load_date'] else 'Never'}")
+    st.caption(f"Last updated: {stats['last_load_date'].strftime('%Y-%m-%d %H:%M') if stats['last_load_date'] else 'Never'}")
 
 else:
     st.warning("⚠️ Could not connect to database")
-    st.info("💡 Run `make init-db` to initialize the database")
+    st.info("Run `make init-db` to initialize the database")
 
 st.markdown("---")
 
@@ -197,7 +193,7 @@ if history_df is not None and len(history_df) > 0:
     st.plotly_chart(fig, use_container_width=True)
     
     # History table
-    st.subheader("📜 Loading History")
+    st.subheader("Loading History")
     
     display_df = history_df.copy()
     display_df['started_at'] = pd.to_datetime(display_df['started_at']).dt.strftime('%Y-%m-%d %H:%M')
@@ -219,7 +215,7 @@ if history_df is not None and len(history_df) > 0:
         }
     )
 else:
-    st.info("📭 No data loading history yet. Initialize the database first.")
+    st.info("No data loading history yet. Initialize the database first.")
 
 st.markdown("---")
 
@@ -286,7 +282,7 @@ if dist_df is not None and len(dist_df) > 0:
         st.metric("Imbalance Ratio", f"{imbalance_ratio:.2f}")
 
 else:
-    st.info("📊 No class distribution data available yet")
+    st.info("No class distribution data available yet")
 
 st.markdown("---")
 
@@ -303,7 +299,7 @@ This will trigger the actual data loading script.
 col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
-    if st.button("📥 Load Next 3%", type="primary", use_container_width=True):
+    if st.button("Load Next 3%", type="primary", use_container_width=True):
         if stats and stats['current_percentage'] >= 100:
             st.warning("⚠️ Already at 100% data loaded")
         else:
@@ -320,13 +316,13 @@ with col1:
                     st.error(f"❌ {result['message']}")
 
 with col2:
-    if st.button("🔄 Refresh Data", use_container_width=True):
+    if st.button("Refresh Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
 with col3:
-    st.caption("💡 Each load adds ~3% more products to the database")
+    st.caption("Each load adds ~3% more products to the database")
 
 # Footer
 st.markdown("---")
-st.caption("💾 Database tracks all changes in audit trail for reproducibility")
+st.caption("Database tracks all changes in audit trail for reproducibility")

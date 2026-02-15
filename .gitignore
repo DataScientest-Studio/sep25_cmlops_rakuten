@@ -60,6 +60,9 @@ target/
 # DotEnv configuration
 .env
 
+# Streamlit secrets
+**/secrets.toml
+
 # Database
 *.db
 *.rdb
@@ -91,3 +94,9 @@ target/
 
 # Mypy cache
 .mypy_cache/
+
+# MLflow local tracking (use remote tracking server instead)
+mlruns/
+
+# Streamlit logs
+streamlit.log

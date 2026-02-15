@@ -29,7 +29,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🔄 Training Pipeline")
+st.title("Training Pipeline")
 
 # MLflow connection
 MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
@@ -50,7 +50,7 @@ client = get_mlflow_client()
 # Refresh button
 col1, col2 = st.columns([6, 1])
 with col2:
-    if st.button("🔄 Refresh", use_container_width=True):
+    if st.button("Refresh", use_container_width=True):
         st.cache_resource.clear()
         st.cache_data.clear()
         st.rerun()
@@ -70,7 +70,7 @@ Generate a balanced dataset from the current database state. This creates a trai
 col1, col2 = st.columns([1, 3])
 
 with col1:
-    if st.button("📦 Generate Balanced Dataset", type="primary", use_container_width=True):
+    if st.button("Generate Balanced Dataset", type="primary", use_container_width=True):
         with st.spinner("Generating balanced dataset... This may take 1-2 minutes"):
             result = run_dataset_generator()
             
@@ -98,7 +98,7 @@ if client:
         dataset_exp = [e for e in experiments if 'dataset' in e.name.lower()]
         
         if dataset_exp:
-            st.subheader("📋 Recent Dataset Generations")
+            st.subheader("Recent Dataset Generations")
             
             runs = client.search_runs(
                 experiment_ids=[dataset_exp[0].experiment_id],
@@ -130,13 +130,13 @@ st.header("2️⃣ Model Training")
 
 st.markdown("""
 Train TF-IDF + Logistic Regression classifier on the current database state.
-All parameters and metrics are logged to MLflow.
+**Auto-promotion enabled**: New models are automatically promoted to Production if they perform better than the current model.
 """)
 
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("⚙️ Training Configuration")
+    st.subheader("Training Configuration")
     
     max_features = st.number_input(
         "Max TF-IDF Features",
@@ -155,37 +155,28 @@ with col1:
         step=0.1,
         help="Inverse of regularization strength"
     )
-    
-    auto_promote = st.checkbox(
-        "🚀 Auto-promote if F1 > 0.70",
-        value=False,
-        help="Automatically promote model to Production if F1 score exceeds threshold"
-    )
 
 with col2:
-    st.subheader("💡 Training Info")
+    st.subheader("Auto-Promotion Logic")
     
     st.info("""
-    **Model Pipeline:**
-    - Text preprocessing (clean, lowercase)
-    - TF-IDF vectorization (1-2 grams)
-    - Logistic Regression classifier
+    **Automatic promotion to Production:**
     
-    **What's logged:**
-    - All hyperparameters
-    - Accuracy, F1, precision, recall
-    - Per-class metrics
-    - Confusion matrix
-    - Model pipeline artifact
+    1. ✅ **Better performance** → Promote to Production, archive old
+    2. ❌ **Worse performance** → Archive new model, keep current Production
+    3. 🆕 **First model** (F1 ≥ 0.70) → Promote to Production
+    4. ⚠️ **Below threshold** (F1 < 0.70) → Archive automatically
+    
+    **No manual intervention needed!** 🎯
     """)
 
 # Train button
-if st.button("🚀 Train Model", type="primary", use_container_width=True):
+if st.button("Train Model", type="primary", use_container_width=True):
     with st.spinner("Training model... This may take 2-4 minutes"):
         result = run_model_training(
             max_features=int(max_features),
             C=float(C_param),
-            auto_promote=auto_promote
+            auto_promote=True  # Always enabled - automatic smart promotion
         )
         
         if result['success']:
@@ -227,7 +218,7 @@ if client:
             )
             
             if runs:
-                st.subheader("📊 Recent Training Runs")
+                st.subheader("Recent Training Runs")
                 
                 run_data = []
                 for run in runs:
@@ -237,10 +228,10 @@ if client:
                     run_data.append({
                         "Date": datetime.fromtimestamp(run.info.start_time / 1000).strftime("%Y-%m-%d %H:%M"),
                         "Run ID": run.info.run_id[:8],
-                        "Accuracy": f"{metrics.get('accuracy', 0):.4f}",
-                        "F1 Score": f"{metrics.get('f1_score', 0):.4f}",
-                        "Precision": f"{metrics.get('precision', 0):.4f}",
-                        "Recall": f"{metrics.get('recall', 0):.4f}",
+                        "Accuracy": f"{metrics.get('test_accuracy', 0):.4f}",
+                        "F1 Score": f"{metrics.get('test_f1_weighted', 0):.4f}",
+                        "Precision": f"{metrics.get('test_precision_weighted', 0):.4f}",
+                        "Recall": f"{metrics.get('test_recall_weighted', 0):.4f}",
                         "Max Features": params.get('max_features', 'N/A'),
                         "C": params.get('C', 'N/A'),
                         "Status": run.info.status
@@ -251,7 +242,7 @@ if client:
                 
                 # Show latest run details
                 if len(runs) > 0:
-                    with st.expander("🔍 Latest Run Details"):
+                    with st.expander("Latest Run Details"):
                         latest_run = runs[0]
                         
                         col1, col2 = st.columns(2)
@@ -270,20 +261,20 @@ if client:
                         try:
                             artifacts = client.list_artifacts(latest_run.info.run_id)
                             for artifact in artifacts:
-                                st.text(f"{'📁' if artifact.is_dir else '📄'} {artifact.path}")
+                                st.text(f"{'Folder' if artifact.is_dir else 'File'} {artifact.path}")
                         except:
                             st.caption("Could not list artifacts")
             else:
-                st.info("📭 No training runs yet. Train your first model above!")
+                st.info("No training runs yet. Train your first model above!")
         else:
-            st.info("📭 No training experiments found in MLflow")
+            st.info("No training experiments found in MLflow")
     
     except Exception as e:
         st.warning(f"⚠️ Could not fetch experiments: {e}")
 
 else:
     st.error("❌ MLflow connection required to view experiments")
-    st.info(f"💡 Make sure MLflow is running at {MLFLOW_URI}")
+    st.info(f"Make sure MLflow is running at {MLFLOW_URI}")
 
 # =============================================================================
 # SECTION 4: MODEL VERSIONING
@@ -309,4 +300,4 @@ No external versioning tools needed!
 
 # Footer
 st.markdown("---")
-st.caption(f"💡 Connected to MLflow at {MLFLOW_URI}")
+st.caption(f"Connected to MLflow at {MLFLOW_URI}")

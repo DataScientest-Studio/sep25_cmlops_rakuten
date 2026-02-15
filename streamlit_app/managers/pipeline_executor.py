@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 # Get project root
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
+# Import environment config utility
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.env_config import load_env_vars, get_env
+
+# Load environment variables on module import
+load_env_vars()
+
 
 def run_data_loader(target_percentage: float = None) -> dict:
     """
@@ -74,6 +81,16 @@ def run_dataset_generator() -> dict:
     """
     try:
         logger.info("Generating balanced dataset")
+        
+        # Set MLflow environment variables for artifact storage
+        os.environ["MLFLOW_TRACKING_URI"] = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+        os.environ["MLFLOW_S3_ENDPOINT_URL"] = os.getenv("MLFLOW_S3_ENDPOINT_URL", "http://localhost:9000")
+        os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("AWS_ACCESS_KEY_ID", "minio_admin")
+        os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("AWS_SECRET_ACCESS_KEY", "minio_password")
+        
+        logger.info(f"MLflow URI: {os.environ['MLFLOW_TRACKING_URI']}")
+        logger.info(f"S3 Endpoint: {os.environ['MLFLOW_S3_ENDPOINT_URL']}")
+        logger.info(f"AWS Key ID: {os.environ['AWS_ACCESS_KEY_ID']}")
         
         # Import and run dataset generator
         sys.path.insert(0, str(PROJECT_ROOT))
@@ -168,9 +185,21 @@ def run_model_training(max_features: int = 5000, C: float = 1.0, auto_promote: b
                 'message': 'No data in database. Please load data first.'
             }
         
-        # Set MLflow tracking URI
+        # Set MLflow tracking URI and S3 credentials for MinIO
         mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
         os.environ["MLFLOW_TRACKING_URI"] = mlflow_uri
+        
+        # Set MinIO/S3 credentials for artifact storage
+        s3_endpoint = os.getenv("MLFLOW_S3_ENDPOINT_URL", "http://localhost:9000")
+        aws_key = os.getenv("AWS_ACCESS_KEY_ID", "minio_admin")
+        aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY", "minio_password")
+        
+        os.environ["MLFLOW_S3_ENDPOINT_URL"] = s3_endpoint
+        os.environ["AWS_ACCESS_KEY_ID"] = aws_key
+        os.environ["AWS_SECRET_ACCESS_KEY"] = aws_secret
+        
+        logger.info(f"MLflow URI: {mlflow_uri}")
+        logger.info(f"S3 Endpoint: {s3_endpoint}")
         
         # Train model
         run_id = train_model(
