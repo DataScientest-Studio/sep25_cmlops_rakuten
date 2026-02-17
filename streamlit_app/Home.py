@@ -187,6 +187,53 @@ with col_test:
 | `make run-streamlit` | Lancer Streamlit |
     """)
 
+# ── Docker Compose ───────────────────────────────────────────────────────────
+
+st.markdown("---")
+st.header("Services Docker")
+
+st.markdown(
+    "L'ensemble du pipeline tourne dans **10 containers** orchestrés par `docker-compose.yml`."
+)
+
+col_d1, col_d2, col_d3 = st.columns(3)
+
+with col_d1:
+    st.markdown("""
+**Données & Stockage**
+| Container | Rôle |
+|-----------|------|
+| `postgres` | Base de données + audit trail |
+| `minio` | Stockage S3 des artifacts MLflow |
+| `minio-init` | Init : crée le bucket au démarrage |
+    """)
+
+with col_d2:
+    st.markdown("""
+**ML & Serving**
+| Container | Rôle |
+|-----------|------|
+| `mlflow` | Tracking des expériences + registre modèles |
+| `api` (FastAPI) | Sert le modèle Production + routes de contrôle |
+| `airflow-scheduler` | Exécute les DAGs (weekly + daily) |
+| `airflow-webserver` | Interface web Airflow (port 8080) |
+| `airflow-init` | Init : crée la DB Airflow + user admin |
+    """)
+
+with col_d3:
+    st.markdown("""
+**Monitoring**
+| Container | Rôle |
+|-----------|------|
+| `prometheus` | Collecte les métriques de l'API |
+| `grafana` | Dashboards (métriques + drift) |
+
+**Local (hors Docker)**
+| Service | Rôle |
+|---------|------|
+| `streamlit` | Interface de présentation + actions |
+    """)
+
 # Footer
 st.markdown("---")
 st.caption("DataScientest MLOps Certification — September 2025")
