@@ -21,7 +21,7 @@ from utils.env_config import get_db_config
 
 # Page configuration
 st.set_page_config(
-    page_title="Données - Rakuten MLOps",
+    page_title="Data - Rakuten MLOps",
     page_icon="🗄️",
     layout="wide",
 )
@@ -113,14 +113,20 @@ def get_class_distribution():
 dist_df = get_class_distribution()
 
 if dist_df is not None and len(dist_df) > 0:
+    # Sort by count ascending so largest bar is at the top
+    plot_df = dist_df.sort_values("count", ascending=True)
+    plot_df["prdtypecode"] = plot_df["prdtypecode"].astype(str)
+
     fig = px.bar(
-        dist_df,
-        x="prdtypecode",
-        y="count",
+        plot_df,
+        x="count",
+        y="prdtypecode",
+        orientation="h",
         title="Distribution des classes (données brutes)",
         labels={"prdtypecode": "Code catégorie", "count": "Nombre de produits"},
     )
     fig.update_traces(marker_color="#1f77b4")
+    fig.update_layout(yaxis=dict(type="category"))
     st.plotly_chart(fig, use_container_width=True)
 
     imbalance = dist_df["count"].max() / dist_df["count"].min() if dist_df["count"].min() > 0 else 0

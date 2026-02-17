@@ -95,11 +95,18 @@ class DriftMonitor:
         """
         Split inference data into reference and current windows.
 
-        Reference window: [now - reference_window_days, now - current_window_days)
-        Current window:   [now - current_window_days, now]
+        Primary strategy (time-based):
+            Reference window: [now - reference_window_days, now - current_window_days)
+            Current window:   [now - current_window_days, now]
+
+        Fallback (proportional, for cold-start):
+            When the time-based reference window has fewer than 30 samples but
+            total data is sufficient, use first 60 % of records as reference
+            and last 40 % as current.  This lets drift analysis run even when
+            the system has been deployed for less than reference_window_days.
 
         Returns:
-            (reference_df, current_df) or (None, None) if insufficient data
+            (reference_df, current_df)
         """
         now = pd.Timestamp.now(tz="UTC") if df["timestamp"].dt.tz else pd.Timestamp.now()
 
@@ -110,6 +117,19 @@ class DriftMonitor:
             (df["timestamp"] >= reference_start) & (df["timestamp"] < current_start)
         ].copy()
         current_df = df[df["timestamp"] >= current_start].copy()
+
+        # -- Fallback: proportional split for cold-start scenarios --
+        min_ref = 30
+        min_cur = 10
+        if len(reference_df) < min_ref and len(df) >= (min_ref + min_cur):
+            logger.warning(
+                f"Time-based reference window too small ({len(reference_df)} samples). "
+                f"Falling back to proportional split on {len(df)} total samples."
+            )
+            df_sorted = df.sort_values("timestamp").reset_index(drop=True)
+            split_idx = int(len(df_sorted) * 0.6)
+            reference_df = df_sorted.iloc[:split_idx].copy()
+            current_df = df_sorted.iloc[split_idx:].copy()
 
         logger.info(
             f"Windows: reference={len(reference_df)} samples "
@@ -143,34 +163,42 @@ class DriftMonitor:
         # Load data
         df = self._load_inference_log()
         if df is None:
-            return self._build_report(
+            report = self._build_report(
                 status="error", message="No inference log available"
             )
+            self._save_report_to_db(report)
+            return report
 
         # Check minimum samples
         if len(df) < thresholds.MIN_SAMPLES_FOR_DRIFT:
-            return self._build_report(
+            report = self._build_report(
                 status="insufficient_data",
                 message=f"Only {len(df)} samples, need {thresholds.MIN_SAMPLES_FOR_DRIFT}",
                 total_samples=len(df),
             )
+            self._save_report_to_db(report)
+            return report
 
         # Split into windows
         reference_df, current_df = self._split_windows(df)
 
         if len(reference_df) < 30:
-            return self._build_report(
+            report = self._build_report(
                 status="insufficient_data",
                 message=f"Reference window has only {len(reference_df)} samples (need >= 30)",
                 total_samples=len(df),
             )
+            self._save_report_to_db(report)
+            return report
 
         if len(current_df) < 10:
-            return self._build_report(
+            report = self._build_report(
                 status="insufficient_data",
                 message=f"Current window has only {len(current_df)} samples (need >= 10)",
                 total_samples=len(df),
             )
+            self._save_report_to_db(report)
+            return report
 
         # Run statistical tests
         logger.info("Running statistical tests...")

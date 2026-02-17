@@ -22,7 +22,7 @@ sys.path.insert(0, str(streamlit_app_root))
 
 # Page configuration
 st.set_page_config(
-    page_title="Modèles - Rakuten MLOps",
+    page_title="Model tracking - Rakuten MLOps",
     page_icon="🔬",
     layout="wide",
 )

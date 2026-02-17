@@ -181,8 +181,10 @@ with tab_history:
         df["report_date"] = pd.to_datetime(df["report_date"])
         df = df.sort_values("report_date")
 
-        if len(df) > 1:
-            chart_df = df.set_index("report_date")[
+        # Chart only completed analyses (avoid flat zeros from error/insufficient reports)
+        completed_df = df[df["status"] == "completed"]
+        if len(completed_df) > 1:
+            chart_df = completed_df.set_index("report_date")[
                 ["overall_drift_score", "data_drift_score", "prediction_drift_score"]
             ].rename(columns={
                 "overall_drift_score": "Global",
@@ -195,10 +197,11 @@ with tab_history:
             "🟢 OK < 0.1 | 🟡 WARNING >= 0.1 | 🟠 ALERT >= 0.2 | 🔴 CRITICAL >= 0.3"
         )
 
-        display_df = df[
-            ["report_date", "severity", "overall_drift_score", "data_drift_score",
-             "prediction_drift_score", "drift_detected", "reference_samples", "current_samples"]
-        ].sort_values("report_date", ascending=False)
+        display_cols = ["report_date", "status", "severity", "overall_drift_score",
+                        "data_drift_score", "prediction_drift_score", "drift_detected",
+                        "reference_samples", "current_samples"]
+        available_cols = [c for c in display_cols if c in df.columns]
+        display_df = df[available_cols].sort_values("report_date", ascending=False)
 
         st.dataframe(
             display_df,
@@ -206,6 +209,7 @@ with tab_history:
             hide_index=True,
             column_config={
                 "report_date": st.column_config.DatetimeColumn("Date", format="YYYY-MM-DD HH:mm"),
+                "status": st.column_config.TextColumn("Statut"),
                 "overall_drift_score": st.column_config.NumberColumn("Global", format="%.4f"),
                 "data_drift_score": st.column_config.NumberColumn("Data PSI", format="%.4f"),
                 "prediction_drift_score": st.column_config.NumberColumn("Pred PSI", format="%.4f"),
