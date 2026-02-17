@@ -1,11 +1,12 @@
 """
 Rakuten MLOps Pipeline - Home & Presentation
 
-Welcome page with project overview and pipeline explanation.
+Welcome page with pipeline diagram.
 """
 import streamlit as st
 from pathlib import Path
 import sys
+import graphviz
 
 # Load environment variables
 sys.path.insert(0, str(Path(__file__).parent))
@@ -14,7 +15,7 @@ load_env_vars()
 
 # Page configuration
 st.set_page_config(
-    page_title="Rakuten MLOps - Home",
+    page_title="Rakuten MLOps - Pipeline",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -41,179 +42,186 @@ st.markdown("""
 
 # Main content
 st.markdown('<div class="main-header">Rakuten MLOps Pipeline</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Product Classification - MLOps Certification Project</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Architecture du Pipeline de Classification de Produits</div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Project Overview
-st.header("Project Overview")
+# Create tabs
+st.header("Architecture du Pipeline")
 
-st.markdown("""
-This project demonstrates a **complete MLOps pipeline** for product classification using:
-- Incremental data loading (40% → 100%)
-- Experiment tracking with MLflow
-- Model versioning and promotion
-- REST API serving with monitoring
-- Drift detection and observability
+tab1, tab2 = st.tabs(["Architecture Actuelle", "Architecture Idéale"])
 
-**Goal**: Classify Rakuten products into 27 categories using text data (designation + description)
-""")
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Pipeline Architecture
-st.header("Pipeline Architecture")
-
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    st.markdown("""
-    ### Core Components
+with tab1:
+    st.subheader("Pipeline Actuel - Containers Docker")
     
-    **1. Data Storage**
-    - PostgreSQL with audit trail
-    - Tracks all data changes
-    - Enables reproducibility
+    # Current architecture with Docker containers
+    diagram_current = graphviz.Digraph()
+    diagram_current.attr(rankdir='TB', size='10,12')
+    diagram_current.attr('node', shape='box', style='filled,rounded', fontname='Arial', fontsize='12')
     
-    **2. Experiment Tracking**
-    - MLflow for runs & metrics
-    - Model registry
-    - Artifact storage (MinIO)
+    # Data Layer
+    diagram_current.node('data', 'Données Brutes\n(CSV Files)', fillcolor='#E8F4F8', color='#2E86AB')
     
-    **3. Model Serving**
-    - FastAPI REST API
-    - Automatic model reloading
-    - Health monitoring
+    # Docker Containers
+    diagram_current.node('postgres', '🐳 PostgreSQL\nContainer\n+ Audit Trail', fillcolor='#B8E6F0', color='#2E86AB')
+    diagram_current.node('mlflow', '🐳 MLflow\nContainer\nTracking & Registry', fillcolor='#FFC266', color='#FF9800')
+    diagram_current.node('minio', '🐳 MinIO\nContainer\nArtifact Storage', fillcolor='#E0E0E0', color='#757575')
+    diagram_current.node('api', '🐳 FastAPI\nContainer\nModel Serving', fillcolor='#A5D6A7', color='#4CAF50')
+    diagram_current.node('prometheus', '🐳 Prometheus\nContainer\nMetrics', fillcolor='#F8BBD0', color='#E91E63')
+    diagram_current.node('grafana', '🐳 Grafana\nContainer\nDashboards', fillcolor='#F48FB1', color='#E91E63')
     
-    **4. Observability**
-    - Prometheus metrics
-    - Grafana dashboards
-    - Inference logging
-    """)
-
-with col2:
-    st.markdown("""
-    ### Pipeline Flow
+    # Training (local)
+    diagram_current.node('training', 'Training Script\n(Local/Manuel)', fillcolor='#FFE5B4', color='#FF9800')
     
-    ```
-    1️⃣ Data Pipeline
-       ↓ Load incremental data
-       ↓ Track in database audit trail
+    # Edges
+    diagram_current.edge('data', 'postgres', label='Load')
+    diagram_current.edge('postgres', 'training', label='Query')
+    diagram_current.edge('training', 'mlflow', label='Log')
+    diagram_current.edge('mlflow', 'minio', label='Store', style='dashed')
+    diagram_current.edge('mlflow', 'api', label='Load Model')
+    diagram_current.edge('api', 'prometheus', label='Metrics')
+    diagram_current.edge('prometheus', 'grafana', label='Visualize')
     
-    2️⃣ Training Pipeline
-       ↓ Generate balanced dataset
-       ↓ Train TF-IDF + LogisticRegression
-       ↓ Log to MLflow
+    st.graphviz_chart(diagram_current)
+
+with tab2:
+    st.subheader("Pipeline Idéal - Workflow Hebdomadaire Automatisé")
     
-    3️⃣ Model Registry
-       ↓ Register model version
-       ↓ Promote to Production
+    col1, col2 = st.columns([3, 2])
     
-    4️⃣ Serving
-       ↓ API loads Production model
-       ↓ Serve predictions
-       ↓ Log inferences
+    with col1:
+        # Ideal architecture
+        diagram_ideal = graphviz.Digraph()
+        diagram_ideal.attr(rankdir='TB', size='10,14')
+        diagram_ideal.attr('node', shape='box', style='filled,rounded', fontname='Arial', fontsize='11')
+        
+        # Data Layer - Weekly increment
+        diagram_ideal.node('data_source', 'Source Données\n(+3% hebdo)', fillcolor='#E8F4F8', color='#2E86AB')
+        diagram_ideal.node('postgres', 'PostgreSQL\n+ Audit Trail', fillcolor='#B8E6F0', color='#2E86AB')
+        diagram_ideal.node('scheduler', 'Scheduler\n(Airflow/Cron)\nHebdomadaire', fillcolor='#FFF3CD', color='#F39C12')
+        
+        # Auto Training Pipeline
+        diagram_ideal.node('auto_load', 'Auto Load\n+3% Data', fillcolor='#D4E6F1', color='#2874A6')
+        diagram_ideal.node('auto_train', 'Auto Training\nNouveau Modèle', fillcolor='#FFE5B4', color='#FF9800')
+        diagram_ideal.node('mlflow', 'MLflow\nTracking & Registry', fillcolor='#FFC266', color='#FF9800')
+        
+        # Model Evaluation & Promotion
+        diagram_ideal.node('eval', 'Évaluation\nPerformances', fillcolor='#C8E6C9', color='#4CAF50')
+        diagram_ideal.node('decision', 'Promotion Auto\nSi F1 > Seuil', fillcolor='#A5D6A7', color='#4CAF50', shape='diamond')
+        diagram_ideal.node('production', 'Modèle Production\nFastAPI', fillcolor='#81C784', color='#4CAF50')
+        
+        # Monitoring & Drift Detection
+        diagram_ideal.node('monitoring', 'Monitoring\nProduction', fillcolor='#F8BBD0', color='#E91E63')
+        diagram_ideal.node('drift_detect', 'Détection Drift\nAutomatique', fillcolor='#F48FB1', color='#E91E63')
+        diagram_ideal.node('alert', 'Alarme\nDrift Important', fillcolor='#F06292', color='#C2185B', shape='box')
+        diagram_ideal.node('human', 'Décision Humaine\nRe-train / Investigate', fillcolor='#FFE082', color='#F57C00')
+        
+        # Storage
+        diagram_ideal.node('storage', 'Cloud Storage\nArtifacts', fillcolor='#E0E0E0', color='#757575')
+        
+        # Weekly cycle edges
+        diagram_ideal.edge('scheduler', 'auto_load', label='Trigger\nhebdo')
+        diagram_ideal.edge('data_source', 'postgres', label='+3%')
+        diagram_ideal.edge('auto_load', 'postgres', label='Load')
+        diagram_ideal.edge('auto_load', 'auto_train', label='Trigger')
+        
+        # Training flow
+        diagram_ideal.edge('postgres', 'auto_train', label='Data')
+        diagram_ideal.edge('auto_train', 'mlflow', label='Log\nrun')
+        diagram_ideal.edge('mlflow', 'storage', label='Artifacts', style='dashed')
+        diagram_ideal.edge('mlflow', 'eval', label='Metrics')
+        
+        # Promotion decision
+        diagram_ideal.edge('eval', 'decision', label='Comparer')
+        diagram_ideal.edge('decision', 'production', label='OUI:\nPromote', color='green')
+        diagram_ideal.edge('decision', 'mlflow', label='NON:\nArchive', color='red', style='dashed')
+        
+        # Production monitoring
+        diagram_ideal.edge('production', 'monitoring', label='Logs\n& Metrics')
+        diagram_ideal.edge('monitoring', 'drift_detect', label='Analyze')
+        diagram_ideal.edge('drift_detect', 'alert', label='Drift > Seuil', color='red')
+        diagram_ideal.edge('alert', 'human', label='Notify')
+        diagram_ideal.edge('human', 'scheduler', label='Action:\nForce retrain', style='dashed')
+        
+        st.graphviz_chart(diagram_ideal)
     
-    5️⃣ Monitoring
-       ↓ Collect metrics
-       ↓ Detect drift
-       ↓ Alert if needed
-    ```
-    """)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Key Features
-st.header("Key MLOps Capabilities")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("""
-    ### Data Versioning
-    - Database audit trail
-    - Batch tracking
-    - Timestamp-based reproducibility
-    - No external tools needed
-    """)
-
-with col2:
-    st.markdown("""
-    ### Experiment Tracking
-    - All hyperparameters logged
-    - Metrics & artifacts stored
-    - Model lineage
-    - Easy comparison
-    """)
-
-with col3:
-    st.markdown("""
-    ### Production Ready
-    - Stage-based promotion
-    - Health checks
-    - Automated reloading
-    - Monitoring & alerting
-    """)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Versioning Strategy
-st.header("Reproducibility Strategy")
-
-st.info("""
-**How we ensure reproducibility without DVC:**
-
-1. **Data Versioning**: PostgreSQL `data_loads` and `products_history` tables track every data change with timestamps
-2. **Experiment Tracking**: MLflow logs all parameters, metrics, and artifacts for every training run
-3. **Model Registry**: Each model version links back to its training run and data version
-
-**To reproduce any training**: Given an MLflow run_id, we can query the database for the exact data state at that time, 
-retrieve all hyperparameters from MLflow, and retrain with identical setup.
-""")
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Quick Links
-st.header("External Services")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("### MLflow UI")
-    st.markdown("http://localhost:5000")
-    st.caption("Experiment tracking & model registry")
-
-with col2:
-    st.markdown("### API Documentation")
-    st.markdown("http://localhost:8000/docs")
-    st.caption("FastAPI Swagger UI")
-
-with col3:
-    st.markdown("### Grafana Dashboards")
-    st.markdown("http://localhost:3000")
-    st.caption("Monitoring & visualization")
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Technical Details
-with st.expander("Technical Stack"):
-    st.markdown("""
-    **Infrastructure**:
-    - PostgreSQL 15 (database with audit trail)
-    - MinIO (S3-compatible object storage)
-    - MLflow 2.10 (experiment tracking)
-    - FastAPI (model serving)
-    - Prometheus + Grafana (monitoring)
+    with col2:
+        st.markdown("### Fonctionnement")
+        
+        st.markdown("""
+        **1. Chargement Hebdomadaire (+3%)**
+        
+        Chaque semaine, un scheduler (Airflow/cron) déclenche:
+        - Chargement automatique de 3% de nouvelles données
+        - Mise à jour de PostgreSQL avec audit trail
+        - Progression de 40% → 100% en ~20 semaines
+        
+        ---
+        
+        **2. Re-entraînement Automatique**
+        
+        Immédiatement après le chargement:
+        - Nouveau modèle entraîné automatiquement
+        - Même architecture (TF-IDF + LogReg)
+        - Toutes les métriques loggées dans MLflow
+        - Artifacts sauvegardés dans cloud storage
+        
+        ---
+        
+        **3. Promotion Conditionnelle**
+        
+        Le nouveau modèle est évalué:
+        - Comparaison des métriques (F1, accuracy)
+        - Si F1 > seuil (ex: 0.75) → Promotion automatique
+        - Si F1 < seuil → Archive dans MLflow (pas de promotion)
+        
+        Cela évite de dégrader la production avec des modèles moins performants.
+        
+        ---
+        
+        **4. Monitoring en Production**
+        
+        Le modèle en production est surveillé:
+        - Logs d'inférence (predictions, confidences)
+        - Métriques de performance
+        - Distribution des prédictions
+        - Latence et errors
+        
+        ---
+        
+        **5. Détection de Drift**
+        
+        Analyse automatique du drift:
+        - **Drift de données**: Distribution des inputs change
+        - **Drift de modèle**: Performances se dégradent
+        - Calcul de scores de drift (KS test, PSI, etc.)
+        
+        ---
+        
+        **6. Alarme & Décision Humaine**
+        
+        Si drift important détecté (> seuil):
+        - Alerte envoyée à l'équipe (email, Slack)
+        - Dashboard de monitoring mis à jour
+        - **Décision humaine requise:**
+          - Investiguer la cause du drift
+          - Forcer un re-entraînement si nécessaire
+          - Ajuster les hyperparamètres
+          - Ou attendre le prochain cycle hebdo
+        
+        ---
+        
+        **Avantages:**
+        - Automatisation du cycle hebdomadaire
+        - Contrôle qualité avant production
+        - Surveillance continue du modèle
+        - Intervention humaine seulement si nécessaire
+        - Traçabilité complète via MLflow
+        """)
+        
+        st.success("**Cycle complet:** Load → Train → Eval → Deploy (si OK) → Monitor → Alert (si drift)")
     
-    **ML Stack**:
-    - scikit-learn (TF-IDF + LogisticRegression)
-    - imbalanced-learn (data balancing)
-    - pandas (data processing)
-    
-    **Deployment**:
-    - Docker Compose (container orchestration)
-    - Streamlit (control room UI)
-    """)
+    st.markdown("<br>", unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")
