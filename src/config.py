@@ -48,7 +48,14 @@ PIPELINE_CONFIG = {
 
 # Airflow Configuration
 AIRFLOW_CONFIG = {
-    "schedule": os.getenv("AIRFLOW_SCHEDULE", "0 0 * * 1"),  # Every Monday at midnight
+    "schedule": os.getenv("AIRFLOW_SCHEDULE", "0 2 * * 1"),  # Every Monday at 2 AM
+}
+
+# Auto-Training & Promotion Configuration
+AUTOMATION_CONFIG = {
+    "auto_promotion_enabled": os.getenv("AUTO_PROMOTION_ENABLED", "true").lower() == "true",
+    "min_f1_threshold": float(os.getenv("MIN_F1_THRESHOLD", "0.75")),
+    "promotion_metric": os.getenv("PROMOTION_METRIC", "weighted_f1"),
 }
 
 # Data Files

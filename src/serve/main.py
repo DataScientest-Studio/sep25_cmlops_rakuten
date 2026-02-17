@@ -10,6 +10,7 @@ import sys
 
 import config
 from routes import router
+from control_routes import control_router
 
 # Configure logging
 logging.basicConfig(
@@ -41,6 +42,7 @@ app.add_middleware(
 
 # Include routes
 app.include_router(router)
+app.include_router(control_router)
 
 
 @app.on_event("startup")

@@ -1,7 +1,60 @@
 version: "3.8"
 
-# Rakuten MLOps - Simplified Stack (No Airflow/Prefect)
-# Core services: PostgreSQL, MinIO, MLflow, API, Monitoring
+# Rakuten MLOps - Full Stack with Airflow Orchestration
+# Services: PostgreSQL, MinIO, MLflow, API, Monitoring, Airflow
+
+# =============================================================================
+# Airflow shared configuration (anchor reused by webserver, scheduler, init)
+# =============================================================================
+x-airflow-common:
+    &airflow-common
+    build:
+        context: .
+        dockerfile: Dockerfile.airflow
+    environment: &airflow-common-env
+        # Airflow core
+        AIRFLOW__CORE__EXECUTOR: LocalExecutor
+        AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-rakuten_user}:${POSTGRES_PASSWORD:-rakuten_pass}@postgres:5432/airflow_db
+        AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=}
+        AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-supersecretkey}
+        AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+        AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+        AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+        AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+        PYTHONPATH: /opt/airflow
+        # Project-specific (used by src/config.py inside Airflow tasks)
+        POSTGRES_HOST: postgres
+        POSTGRES_PORT: "5432"
+        POSTGRES_DB: ${POSTGRES_DB:-rakuten_db}
+        POSTGRES_USER: ${POSTGRES_USER:-rakuten_user}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rakuten_pass}
+        MLFLOW_TRACKING_URI: http://mlflow:5000
+        MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+        AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio_admin}
+        AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio_password}
+        DATA_PATH: /opt/airflow/data/raw
+        ENVIRONMENT: docker
+        MIN_F1_THRESHOLD: ${MIN_F1_THRESHOLD:-0.75}
+        AUTO_PROMOTION_ENABLED: ${AUTO_PROMOTION_ENABLED:-true}
+        AIRFLOW_SCHEDULE: ${AIRFLOW_SCHEDULE:-0 2 * * 1}
+        DRIFT_CHECK_SCHEDULE: ${DRIFT_CHECK_SCHEDULE:-0 1 * * *}
+        DRIFT_WARNING_THRESHOLD: ${DRIFT_WARNING_THRESHOLD:-0.1}
+        DRIFT_ALERT_THRESHOLD: ${DRIFT_ALERT_THRESHOLD:-0.2}
+        DRIFT_CRITICAL_THRESHOLD: ${DRIFT_CRITICAL_THRESHOLD:-0.3}
+        INFERENCE_LOG_PATH: /opt/airflow/data/monitoring/inference_log.csv
+    volumes:
+        - ./orchestration/dags:/opt/airflow/dags
+        - ./src:/opt/airflow/src
+        - ./scripts:/opt/airflow/scripts
+        - ./data:/opt/airflow/data
+        - airflow_logs:/opt/airflow/logs
+    networks:
+        - rakuten_network
+    depends_on:
+        postgres:
+            condition: service_healthy
+        mlflow:
+            condition: service_healthy
 
 services:
     # ============================================================================
@@ -212,6 +265,71 @@ services:
             - rakuten_network
         restart: unless-stopped
 
+    # ============================================================================
+    # ORCHESTRATION - APACHE AIRFLOW
+    # ============================================================================
+    airflow-init:
+        <<: *airflow-common
+        container_name: rakuten_airflow_init
+        entrypoint: /bin/bash
+        command:
+            - -c
+            - |
+                airflow db init &&
+                airflow users create \
+                    --username $${AIRFLOW_USER:-admin} \
+                    --password $${AIRFLOW_PASSWORD:-admin} \
+                    --firstname Admin \
+                    --lastname User \
+                    --role Admin \
+                    --email admin@example.com || true &&
+                echo "Airflow initialized successfully"
+        environment:
+            <<: *airflow-common-env
+            AIRFLOW_USER: ${AIRFLOW_USER:-admin}
+            AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
+        restart: "no"
+
+    airflow-webserver:
+        <<: *airflow-common
+        container_name: rakuten_airflow_webserver
+        command: airflow webserver --port 8080
+        ports:
+            - "${AIRFLOW_PORT:-8080}:8080"
+        healthcheck:
+            test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 60s
+        depends_on:
+            postgres:
+                condition: service_healthy
+            mlflow:
+                condition: service_healthy
+            airflow-init:
+                condition: service_completed_successfully
+        restart: unless-stopped
+
+    airflow-scheduler:
+        <<: *airflow-common
+        container_name: rakuten_airflow_scheduler
+        command: airflow scheduler
+        healthcheck:
+            test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 60s
+        depends_on:
+            postgres:
+                condition: service_healthy
+            mlflow:
+                condition: service_healthy
+            airflow-init:
+                condition: service_completed_successfully
+        restart: unless-stopped
+
 networks:
     rakuten_network:
         driver: bridge
@@ -221,3 +339,4 @@ volumes:
     minio_data:
     prometheus_data:
     grafana_data:
+    airflow_logs:

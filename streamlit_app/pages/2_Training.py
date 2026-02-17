@@ -1,7 +1,8 @@
 """
-Training Pipeline
+Modèles & Prédiction
 
-Data preparation, model training, and experiment tracking.
+Tab 1: Model tracking, auto-training, auto-promotion explanations
+Tab 2: Test a prediction against the deployed model
 """
 import streamlit as st
 import sys
@@ -9,295 +10,245 @@ from pathlib import Path
 import pandas as pd
 import mlflow
 from mlflow.tracking import MlflowClient
+import requests
 import os
 from datetime import datetime
 
-# Add project root to path
+# Add paths
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
-
-# Add streamlit_app to path
 streamlit_app_root = Path(__file__).parent.parent
 sys.path.insert(0, str(streamlit_app_root))
 
-from managers.pipeline_executor import run_dataset_generator, run_model_training
-
 # Page configuration
 st.set_page_config(
-    page_title="Training - Rakuten MLOps",
-    page_icon="🔄",
-    layout="wide"
+    page_title="Modèles - Rakuten MLOps",
+    page_icon="🔬",
+    layout="wide",
 )
 
-st.title("Training Pipeline")
+st.title("Modèles & Prédiction")
 
-# MLflow connection
+# Config
 MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+
 
 @st.cache_resource
 def get_mlflow_client():
-    """Create MLflow client"""
     try:
         mlflow.set_tracking_uri(MLFLOW_URI)
-        client = MlflowClient(tracking_uri=MLFLOW_URI)
-        return client
+        return MlflowClient(tracking_uri=MLFLOW_URI)
     except Exception as e:
-        st.error(f"❌ Could not connect to MLflow: {e}")
+        st.error(f"MLflow non disponible : {e}")
         return None
+
 
 client = get_mlflow_client()
 
-# Refresh button
-col1, col2 = st.columns([6, 1])
-with col2:
-    if st.button("Refresh", use_container_width=True):
-        st.cache_resource.clear()
-        st.cache_data.clear()
-        st.rerun()
+tab_tracking, tab_predict = st.tabs(["Suivi des modèles", "Test de prédiction"])
 
-# =============================================================================
-# SECTION 1: DATASET GENERATION
-# =============================================================================
-st.header("1️⃣ Dataset Preparation")
+# ─────────────────────────────────────────────────────────────────────────────
+# Tab 1 : Model Tracking
+# ─────────────────────────────────────────────────────────────────────────────
 
-st.markdown("""
-Generate a balanced dataset from the current database state. This creates a training-ready dataset with:
-- Class balancing (RandomOverSampling)
-- Logged to MLflow for versioning
-- Saved as parquet for reproducibility
-""")
+with tab_tracking:
 
-col1, col2 = st.columns([1, 3])
+    # ── Explanations ─────────────────────────────────────────────────────────
 
-with col1:
-    if st.button("Generate Balanced Dataset", type="primary", use_container_width=True):
-        with st.spinner("Generating balanced dataset... This may take 1-2 minutes"):
-            result = run_dataset_generator()
-            
-            if result['success']:
-                st.success(f"✅ {result['message']}")
-                st.info(f"📊 Size: {result.get('dataset_size', 0):,} samples")
-                st.info(f"🔬 MLflow Run: {result.get('run_id', 'N/A')[:8]}...")
-                st.cache_data.clear()
+    st.header("Auto-training & Auto-promotion")
+
+    col_train, col_promo = st.columns(2)
+
+    with col_train:
+        st.markdown("""
+**Entraînement automatique** (hebdomadaire, Airflow)
+
+Chaque lundi à 2h, le DAG `weekly_ml_pipeline` :
+1. Charge +3 % de données dans PostgreSQL
+2. Génère un dataset rééquilibré (RandomOverSampler)
+3. Entraîne un modèle TF-IDF + LogReg
+4. Enregistre le run, les métriques et les artifacts dans MLflow
+        """)
+
+    with col_promo:
+        st.markdown("""
+**Promotion conditionnelle**
+
+Après chaque entraînement, le modèle est évalué :
+- **F1 >= 0.75** et **meilleur** que le modèle en Production → promotion automatique
+- **F1 < 0.75** ou **moins bon** → archivage, le modèle actuel reste en Production
+
+Cela évite toute dégradation non contrôlée du service.
+        """)
+
+    st.markdown("")
+    st.link_button("Ouvrir MLflow UI", "http://localhost:5000")
+
+    st.markdown("---")
+
+    # ── Model registry ───────────────────────────────────────────────────────
+
+    st.header("Registre des modèles")
+
+    if client:
+        try:
+            registered_models = client.search_registered_models()
+
+            if registered_models:
+                for model in registered_models:
+                    versions = client.search_model_versions(f"name='{model.name}'")
+
+                    if versions:
+                        version_data = []
+                        for v in versions:
+                            version_data.append({
+                                "Version": v.version,
+                                "Stage": v.current_stage,
+                                "Créé le": datetime.fromtimestamp(
+                                    v.creation_timestamp / 1000
+                                ).strftime("%Y-%m-%d %H:%M"),
+                                "Run ID": v.run_id[:8] if v.run_id else "N/A",
+                            })
+
+                        st.dataframe(
+                            pd.DataFrame(version_data),
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+
+                        c1, c2, c3, c4 = st.columns(4)
+                        c1.metric("Production", sum(1 for v in versions if v.current_stage == "Production"))
+                        c2.metric("Staging",    sum(1 for v in versions if v.current_stage == "Staging"))
+                        c3.metric("None",       sum(1 for v in versions if v.current_stage == "None"))
+                        c4.metric("Archived",   sum(1 for v in versions if v.current_stage == "Archived"))
             else:
-                st.error(f"❌ {result['message']}")
+                st.info("Aucun modèle enregistré. Lancez un premier entraînement.")
 
-with col2:
-    st.info("""
-    **What this does:**
-    1. Queries current products from database
-    2. Applies RandomOverSampling for class balance
-    3. Logs dataset metadata to MLflow
-    4. Saves as parquet file
-    """)
+        except Exception as e:
+            st.warning(f"Impossible de charger le registre : {e}")
+    else:
+        st.info(f"MLflow non disponible ({MLFLOW_URI})")
 
-# Show recent dataset runs if available
-if client:
-    try:
-        experiments = client.search_experiments()
-        dataset_exp = [e for e in experiments if 'dataset' in e.name.lower()]
-        
-        if dataset_exp:
-            st.subheader("Recent Dataset Generations")
-            
-            runs = client.search_runs(
-                experiment_ids=[dataset_exp[0].experiment_id],
-                max_results=5,
-                order_by=["start_time DESC"]
-            )
-            
-            if runs:
-                run_data = []
-                for run in runs:
-                    run_data.append({
-                        "Date": datetime.fromtimestamp(run.info.start_time / 1000).strftime("%Y-%m-%d %H:%M"),
-                        "Percentage": run.data.params.get('percentage', 'N/A'),
-                        "Size": f"{run.data.metrics.get('total_samples', 0):,.0f}",
-                        "Classes": f"{run.data.metrics.get('num_classes', 0):.0f}",
-                        "Imbalance": f"{run.data.metrics.get('imbalance_ratio_after', 0):.2f}"
-                    })
-                
-                st.dataframe(pd.DataFrame(run_data), use_container_width=True, hide_index=True)
-    except:
-        pass
+    st.markdown("---")
 
-st.markdown("---")
+    # ── Recent training runs ─────────────────────────────────────────────────
 
-# =============================================================================
-# SECTION 2: MODEL TRAINING
-# =============================================================================
-st.header("2️⃣ Model Training")
+    st.header("Derniers entraînements")
 
-st.markdown("""
-Train TF-IDF + Logistic Regression classifier on the current database state.
-**Auto-promotion enabled**: New models are automatically promoted to Production if they perform better than the current model.
-""")
+    if client:
+        try:
+            experiments = client.search_experiments()
+            training_exp = [e for e in experiments if "training" in e.name.lower()]
 
-col1, col2 = st.columns([1, 1])
+            if training_exp:
+                runs = client.search_runs(
+                    experiment_ids=[training_exp[0].experiment_id],
+                    max_results=10,
+                    order_by=["start_time DESC"],
+                )
 
-with col1:
-    st.subheader("Training Configuration")
-    
-    max_features = st.number_input(
-        "Max TF-IDF Features",
-        min_value=1000,
-        max_value=10000,
-        value=5000,
-        step=1000,
-        help="Maximum number of TF-IDF features to extract"
-    )
-    
-    C_param = st.number_input(
-        "C (Regularization)",
-        min_value=0.1,
-        max_value=10.0,
-        value=1.0,
-        step=0.1,
-        help="Inverse of regularization strength"
-    )
+                if runs:
+                    run_rows = []
+                    for run in runs:
+                        m = run.data.metrics
+                        p = run.data.params
+                        run_rows.append({
+                            "Date": datetime.fromtimestamp(
+                                run.info.start_time / 1000
+                            ).strftime("%Y-%m-%d %H:%M"),
+                            "Run ID": run.info.run_id[:8],
+                            "F1": f"{m.get('test_f1_weighted', 0):.4f}",
+                            "Accuracy": f"{m.get('test_accuracy', 0):.4f}",
+                            "Features": p.get("max_features", "?"),
+                            "C": p.get("C", "?"),
+                        })
 
-with col2:
-    st.subheader("Auto-Promotion Logic")
-    
-    st.info("""
-    **Automatic promotion to Production:**
-    
-    1. ✅ **Better performance** → Promote to Production, archive old
-    2. ❌ **Worse performance** → Archive new model, keep current Production
-    3. 🆕 **First model** (F1 ≥ 0.70) → Promote to Production
-    4. ⚠️ **Below threshold** (F1 < 0.70) → Archive automatically
-    
-    **No manual intervention needed!** 🎯
-    """)
-
-# Train button
-if st.button("Train Model", type="primary", use_container_width=True):
-    with st.spinner("Training model... This may take 2-4 minutes"):
-        result = run_model_training(
-            max_features=int(max_features),
-            C=float(C_param),
-            auto_promote=True  # Always enabled - automatic smart promotion
-        )
-        
-        if result['success']:
-            st.success(f"✅ {result['message']}")
-            st.balloons()
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Samples", f"{result.get('samples', 0):,}")
-            with col2:
-                st.metric("Classes", result.get('classes', 0))
-            with col3:
-                st.info(f"🔬 Run ID: {result.get('run_id', 'N/A')[:8]}...")
-            
-            st.cache_data.clear()
-            st.cache_resource.clear()
-        else:
-            st.error(f"❌ {result['message']}")
-
-st.markdown("---")
-
-# =============================================================================
-# SECTION 3: EXPERIMENT TRACKING
-# =============================================================================
-st.header("3️⃣ Training History & Experiments")
-
-if client:
-    try:
-        # Get model training experiments
-        experiments = client.search_experiments()
-        training_exp = [e for e in experiments if 'training' in e.name.lower()]
-        
-        if training_exp:
-            # Get recent runs
-            runs = client.search_runs(
-                experiment_ids=[training_exp[0].experiment_id],
-                max_results=10,
-                order_by=["start_time DESC"]
-            )
-            
-            if runs:
-                st.subheader("Recent Training Runs")
-                
-                run_data = []
-                for run in runs:
-                    metrics = run.data.metrics
-                    params = run.data.params
-                    
-                    run_data.append({
-                        "Date": datetime.fromtimestamp(run.info.start_time / 1000).strftime("%Y-%m-%d %H:%M"),
-                        "Run ID": run.info.run_id[:8],
-                        "Accuracy": f"{metrics.get('test_accuracy', 0):.4f}",
-                        "F1 Score": f"{metrics.get('test_f1_weighted', 0):.4f}",
-                        "Precision": f"{metrics.get('test_precision_weighted', 0):.4f}",
-                        "Recall": f"{metrics.get('test_recall_weighted', 0):.4f}",
-                        "Max Features": params.get('max_features', 'N/A'),
-                        "C": params.get('C', 'N/A'),
-                        "Status": run.info.status
-                    })
-                
-                df = pd.DataFrame(run_data)
-                st.dataframe(df, use_container_width=True, hide_index=True)
-                
-                # Show latest run details
-                if len(runs) > 0:
-                    with st.expander("Latest Run Details"):
-                        latest_run = runs[0]
-                        
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.markdown("**Parameters**")
-                            for key, value in latest_run.data.params.items():
-                                st.text(f"{key}: {value}")
-                        
-                        with col2:
-                            st.markdown("**Metrics**")
-                            for key, value in latest_run.data.metrics.items():
-                                st.text(f"{key}: {value:.4f}")
-                        
-                        st.markdown("**Artifacts**")
-                        try:
-                            artifacts = client.list_artifacts(latest_run.info.run_id)
-                            for artifact in artifacts:
-                                st.text(f"{'Folder' if artifact.is_dir else 'File'} {artifact.path}")
-                        except:
-                            st.caption("Could not list artifacts")
+                    st.dataframe(
+                        pd.DataFrame(run_rows),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                else:
+                    st.info("Aucun entraînement trouvé.")
             else:
-                st.info("No training runs yet. Train your first model above!")
-        else:
-            st.info("No training experiments found in MLflow")
-    
-    except Exception as e:
-        st.warning(f"⚠️ Could not fetch experiments: {e}")
+                st.info("Pas d'expérience de training dans MLflow.")
+        except Exception as e:
+            st.warning(f"Impossible de charger les runs : {e}")
 
-else:
-    st.error("❌ MLflow connection required to view experiments")
-    st.info(f"Make sure MLflow is running at {MLFLOW_URI}")
+# ─────────────────────────────────────────────────────────────────────────────
+# Tab 2 : Test Prediction
+# ─────────────────────────────────────────────────────────────────────────────
 
-# =============================================================================
-# SECTION 4: MODEL VERSIONING
-# =============================================================================
-st.header("4️⃣ Model Versioning Strategy")
+with tab_predict:
 
-st.markdown("""
-**Every training run creates a complete version:**
+    st.header("Tester une prédiction")
 
-1. **Data Version**: Linked via database timestamp (which batch was used)
-2. **Code Version**: Git commit hash (can be tagged in MLflow)
-3. **Parameter Version**: All hyperparameters logged to MLflow
-4. **Model Version**: Artifact stored in MinIO via MLflow
+    st.markdown(
+        "Envoyez une requête au modèle **Production** déployé sur FastAPI. "
+        "Chaque prédiction est loggée pour le suivi du drift."
+    )
 
-**To reproduce any training:**
-- Get MLflow run_id
-- Query database for data state at training time
-- Retrieve all parameters from MLflow
-- Retrain with identical setup
+    st.link_button("Ouvrir la documentation API", f"{API_URL}/docs")
 
-No external versioning tools needed!
-""")
+    examples = {
+        "Livre Harry Potter": {
+            "designation": "Harry Potter à l'école des sorciers",
+            "description": "Premier tome de la saga Harry Potter. Roman jeunesse fantastique.",
+        },
+        "Chaise de bureau": {
+            "designation": "Chaise de bureau ergonomique",
+            "description": "Chaise avec dossier réglable, accoudoirs, roulettes pour parquet.",
+        },
+        "Console PlayStation": {
+            "designation": "PlayStation 5 Console",
+            "description": "Console de jeux vidéo nouvelle génération avec lecteur Blu-ray.",
+        },
+    }
 
-# Footer
-st.markdown("---")
-st.caption(f"Connected to MLflow at {MLFLOW_URI}")
+    example_choice = st.selectbox(
+        "Exemple ou saisie libre",
+        options=["Saisie libre"] + list(examples.keys()),
+    )
+
+    if example_choice != "Saisie libre":
+        selected = examples[example_choice]
+        designation = st.text_input("Designation", value=selected["designation"])
+        description = st.text_area("Description", value=selected["description"], height=80)
+    else:
+        designation = st.text_input("Designation", value="")
+        description = st.text_area("Description", value="", height=80)
+
+    if st.button("Prédire", type="primary", disabled=(not designation or not description)):
+        payload = {"designation": designation, "description": description}
+
+        try:
+            with st.spinner("Prédiction en cours..."):
+                response = requests.post(f"{API_URL}/predict", json=payload, timeout=10)
+
+            if response.status_code == 200:
+                result = response.json()
+
+                col1, col2 = st.columns(2)
+                col1.metric("Classe prédite", result.get("predicted_class", "N/A"))
+                col2.metric("Confiance", f"{result.get('confidence', 0):.2%}")
+
+                if "probabilities" in result:
+                    probs = result["probabilities"]
+                    top = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:5]
+                    st.dataframe(
+                        pd.DataFrame(top, columns=["Classe", "Probabilité"]),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                with st.expander("Réponse API complète"):
+                    st.json(result)
+            else:
+                st.error(f"Erreur API : {response.status_code}")
+                st.text(response.text)
+
+        except requests.exceptions.ConnectionError:
+            st.error(f"API non disponible ({API_URL})")
+        except Exception as e:
+            st.error(f"Erreur : {e}")

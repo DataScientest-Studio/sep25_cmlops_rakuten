@@ -1,0 +1,17 @@
+FROM apache/airflow:2.8.0-python3.10
+
+USER root
+
+# System dependencies for building Python packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc g++ && \
+    rm -rf /var/lib/apt/lists/*
+
+USER airflow
+
+# Install project Python dependencies (separate from Airflow's own deps)
+COPY requirements-airflow.txt /tmp/requirements-airflow.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-airflow.txt
+
+# Download NLTK data for text preprocessing
+RUN python -m nltk.downloader punkt stopwords punkt_tab -d /home/airflow/nltk_data

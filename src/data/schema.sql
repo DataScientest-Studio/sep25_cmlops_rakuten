@@ -199,3 +199,40 @@ SELECT
 FROM processed_products
 GROUP BY prdtypecode, prodtype
 ORDER BY total_products DESC;
+
+-- ============================================================================
+-- DRIFT MONITORING
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS drift_reports (
+    id SERIAL PRIMARY KEY,
+    report_date TIMESTAMP NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    data_drift_score FLOAT,
+    prediction_drift_score FLOAT,
+    performance_drift_score FLOAT,
+    overall_drift_score FLOAT,
+    drift_detected BOOLEAN,
+    severity VARCHAR(20),
+    reference_samples INTEGER,
+    current_samples INTEGER,
+    details JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_drift_reports_date ON drift_reports(report_date);
+CREATE INDEX IF NOT EXISTS idx_drift_reports_severity ON drift_reports(severity);
+
+-- ============================================================================
+-- ALERT ACTIONS (human decisions on alerts)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS alert_actions (
+    id SERIAL PRIMARY KEY,
+    drift_report_id INTEGER REFERENCES drift_reports(id),
+    action_type VARCHAR(50) NOT NULL,
+    action_details JSONB,
+    performed_by VARCHAR(100) DEFAULT 'system',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_actions_report ON alert_actions(drift_report_id);
+CREATE INDEX IF NOT EXISTS idx_alert_actions_type ON alert_actions(action_type);

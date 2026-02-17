@@ -1,0 +1,40 @@
+# Dependencies for Airflow tasks (ML pipeline)
+# Note: Flask/Werkzeug are NOT pinned here to avoid conflicts with Airflow
+
+numpy==1.26.4
+pandas==2.2.2
+
+# Database
+psycopg2-binary==2.9.10
+sqlalchemy==1.4.50
+
+# MLflow
+mlflow==2.18.0
+
+# Machine Learning
+scikit-learn==1.5.2
+scipy==1.14.1
+imbalanced-learn==0.12.4
+
+# NLP
+nltk==3.9.2
+
+# Configuration
+python-dotenv==1.0.1
+
+# Visualization (for dataset generator plots)
+matplotlib==3.9.3
+seaborn==0.13.2
+
+# Image Processing
+pillow==11.0.0
+
+# Progress bars
+tqdm==4.66.4
+
+# MinIO / S3
+boto3==1.34.149
+botocore==1.34.149
+
+# Utilities
+joblib==1.5.2
