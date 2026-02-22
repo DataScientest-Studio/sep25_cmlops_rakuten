@@ -102,3 +102,40 @@ def get_env(key, default=None):
     """
     load_env_vars()
     return os.getenv(key, default)
+
+
+CATEGORY_NAMES = {
+    10: "Livres",
+    40: "Jeux video",
+    50: "Accessoires gaming",
+    60: "Consoles retro",
+    1140: "Figurines",
+    1160: "Cartes de collection",
+    1180: "Jeux de plateau & Figurines",
+    1280: "Jouets & Peluches",
+    1281: "Jeux de construction",
+    1300: "Modelisme & Drones",
+    1301: "Vetements bebe",
+    1302: "Jeux d'exterieur enfants",
+    1320: "Puericulture",
+    1560: "Ameublement & Literie",
+    1920: "Linge & Decoration maison",
+    1940: "Epicerie & Gourmandises",
+    2060: "Decoration & Objets",
+    2220: "Animalerie",
+    2280: "Magazines & Revues",
+    2403: "Livres anciens & Partitions",
+    2462: "Consoles & Jeux video (packs)",
+    2522: "Fournitures de bureau",
+    2582: "Mobilier d'exterieur",
+    2583: "Piscine & Jardin",
+    2585: "Outillage & Bricolage",
+    2705: "Litterature & Essais",
+    2905: "Jeux video dematerialises",
+}
+
+
+def get_category_label(code):
+    """Return 'code - Name' if known, otherwise just the code as string."""
+    name = CATEGORY_NAMES.get(int(code), None)
+    return f"{code} - {name}" if name else str(code)

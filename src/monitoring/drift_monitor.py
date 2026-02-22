@@ -118,18 +118,22 @@ class DriftMonitor:
         ].copy()
         current_df = df[df["timestamp"] >= current_start].copy()
 
-        # -- Fallback: proportional split for cold-start scenarios --
+        # -- Fallback: random split for cold-start scenarios --
+        # A chronological split would create artificial drift when older
+        # and newer predictions happen to have different characteristics
+        # (e.g. early testing vs. diverse production traffic). A random
+        # split keeps both halves representative of the same distribution.
         min_ref = 30
         min_cur = 10
         if len(reference_df) < min_ref and len(df) >= (min_ref + min_cur):
             logger.warning(
                 f"Time-based reference window too small ({len(reference_df)} samples). "
-                f"Falling back to proportional split on {len(df)} total samples."
+                f"Falling back to random split on {len(df)} total samples."
             )
-            df_sorted = df.sort_values("timestamp").reset_index(drop=True)
-            split_idx = int(len(df_sorted) * 0.6)
-            reference_df = df_sorted.iloc[:split_idx].copy()
-            current_df = df_sorted.iloc[split_idx:].copy()
+            df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+            split_idx = int(len(df_shuffled) * 0.6)
+            reference_df = df_shuffled.iloc[:split_idx].copy()
+            current_df = df_shuffled.iloc[split_idx:].copy()
 
         logger.info(
             f"Windows: reference={len(reference_df)} samples "

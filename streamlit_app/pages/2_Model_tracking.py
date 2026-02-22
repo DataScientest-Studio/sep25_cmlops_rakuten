@@ -20,6 +20,8 @@ sys.path.insert(0, str(project_root))
 streamlit_app_root = Path(__file__).parent.parent
 sys.path.insert(0, str(streamlit_app_root))
 
+from utils.env_config import get_category_label
+
 # Page configuration
 st.set_page_config(
     page_title="Model tracking - Rakuten MLOps",
@@ -237,15 +239,18 @@ with tab_predict:
             if response.status_code == 200:
                 result = response.json()
 
+                predicted = result.get("predicted_class", "N/A")
                 col1, col2 = st.columns(2)
-                col1.metric("Classe prédite", result.get("predicted_class", "N/A"))
+                col1.metric("Classe prédite", get_category_label(predicted))
                 col2.metric("Confiance", f"{result.get('confidence', 0):.2%}")
 
                 if "probabilities" in result:
                     probs = result["probabilities"]
                     top = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:5]
+                    top_df = pd.DataFrame(top, columns=["Code", "Probabilité"])
+                    top_df["Catégorie"] = top_df["Code"].apply(get_category_label)
                     st.dataframe(
-                        pd.DataFrame(top, columns=["Classe", "Probabilité"]),
+                        top_df[["Catégorie", "Probabilité"]],
                         use_container_width=True,
                         hide_index=True,
                     )

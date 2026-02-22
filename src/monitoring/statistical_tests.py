@@ -23,7 +23,6 @@ def population_stability_index(
     reference: np.ndarray,
     current: np.ndarray,
     bins: int = 10,
-    eps: float = 1e-6,
 ) -> float:
     """
     Calculate Population Stability Index (PSI) between two distributions.
@@ -33,16 +32,17 @@ def population_stability_index(
       - 0.1 <= PSI < 0.2 : moderate shift (warning)
       - PSI >= 0.2 : significant shift (alert)
 
+    Uses an adaptive floor ``0.5 / N`` for empty bins so that the score
+    stays bounded even when many bins are empty (sparse data / few samples).
+
     Args:
         reference: Reference distribution values
         current: Current distribution values
         bins: Number of bins for histogram
-        eps: Small value to avoid division by zero
 
     Returns:
         PSI score (float >= 0)
     """
-    # Create bins from reference distribution
     breakpoints = np.linspace(
         min(np.min(reference), np.min(current)),
         max(np.max(reference), np.max(current)),
@@ -52,12 +52,14 @@ def population_stability_index(
     ref_counts, _ = np.histogram(reference, bins=breakpoints)
     cur_counts, _ = np.histogram(current, bins=breakpoints)
 
-    # Normalize to proportions
-    ref_pct = ref_counts / len(reference) + eps
-    cur_pct = cur_counts / len(current) + eps
+    ref_floor = 0.5 / len(reference)
+    cur_floor = 0.5 / len(current)
+
+    ref_pct = np.maximum(ref_counts / len(reference), ref_floor)
+    cur_pct = np.maximum(cur_counts / len(current), cur_floor)
 
     psi = np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct))
-    return float(psi)
+    return float(max(psi, 0.0))
 
 
 def ks_test(reference: np.ndarray, current: np.ndarray) -> Dict:
@@ -177,6 +179,56 @@ def jensen_shannon_divergence(
     return float(np.clip(jsd, 0, 1))
 
 
+def categorical_psi(
+    reference: np.ndarray,
+    current: np.ndarray,
+) -> float:
+    """
+    Bias-corrected PSI for categorical data.
+
+    Compares per-category proportions directly instead of binning numeric
+    codes.  Subtracts the expected PSI under the null hypothesis (no
+    drift) to eliminate the upward bias caused by small samples:
+
+        E[PSI_null] ≈ (K - 1) × (1/n_ref + 1/n_cur)
+
+    where K is the number of categories.  Without this correction the raw
+    PSI for ~25 classes with ~100 samples per window is already ≈ 0.4–0.5
+    even when the distributions are identical.
+
+    Uses an adaptive floor ``0.5 / N`` for zero-count categories so that
+    the log-ratio stays bounded.
+
+    Args:
+        reference: Reference category values (e.g. predicted class codes)
+        current: Current category values
+
+    Returns:
+        Bias-corrected PSI score (float >= 0)
+    """
+    n_ref = len(reference)
+    n_cur = len(current)
+    all_categories = np.union1d(np.unique(reference), np.unique(current))
+    k = len(all_categories)
+
+    ref_counts = pd.Series(reference).value_counts()
+    cur_counts = pd.Series(current).value_counts()
+
+    ref_floor = 0.5 / n_ref
+    cur_floor = 0.5 / n_cur
+
+    ref_pct = np.array(
+        [max(ref_counts.get(c, 0) / n_ref, ref_floor) for c in all_categories]
+    )
+    cur_pct = np.array(
+        [max(cur_counts.get(c, 0) / n_cur, cur_floor) for c in all_categories]
+    )
+
+    raw_psi = float(np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct)))
+    bias = (k - 1) * (1.0 / n_ref + 1.0 / n_cur)
+    return max(raw_psi - bias, 0.0)
+
+
 def compute_drift_scores(
     reference_df: pd.DataFrame,
     current_df: pd.DataFrame,
@@ -227,9 +279,7 @@ def compute_drift_scores(
         if len(ref_pred) > 0 and len(cur_pred) > 0:
             results["prediction_drift"] = {
                 "chi_square": chi_square_test(ref_pred, cur_pred),
-                "psi": population_stability_index(
-                    ref_pred.astype(float), cur_pred.astype(float), bins=20
-                ),
+                "psi": categorical_psi(ref_pred, cur_pred),
             }
 
     # -- Confidence drift --
