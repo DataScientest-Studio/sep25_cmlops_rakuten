@@ -1,7 +1,7 @@
 """
-Données & Stratégie d'Entraînement
+Donnees
 
-Overview of the database state and explanation of the training approach.
+Presentation du jeu de donnees, du processus d'ingestion et du suivi des donnees.
 """
 import streamlit as st
 import sys
@@ -11,7 +11,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import plotly.express as px
 
-# Add paths
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 streamlit_app_root = Path(__file__).parent.parent
@@ -19,23 +18,20 @@ sys.path.insert(0, str(streamlit_app_root))
 
 from utils.env_config import get_db_config
 
-# Page configuration
 st.set_page_config(
-    page_title="Data - Rakuten MLOps",
-    page_icon="🗄️",
+    page_title="Donnees - Rakuten MLOps",
+    page_icon="",
     layout="wide",
 )
 
-st.title("Données & Stratégie d'Entraînement")
+st.title("Donnees")
 
 DB_CONFIG = get_db_config()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Section 1 : État de la base de données
-# ─────────────────────────────────────────────────────────────────────────────
 
-st.header("État de la base de données")
-
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 @st.cache_data(ttl=30)
 def get_database_stats():
@@ -72,26 +68,6 @@ def get_database_stats():
         return None
 
 
-stats = get_database_stats()
-
-if stats:
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Produits en base", f"{stats['total_products']:,}")
-    c2.metric("Classes", stats["total_classes"])
-    c3.metric("Données chargées", f"{stats['current_percentage']:.0f} %")
-    c4.metric("Prochain chargement", f"{min(stats['current_percentage'] + 3, 100):.0f} %")
-
-    st.progress(stats["current_percentage"] / 100)
-    if stats["last_load_date"]:
-        st.caption(f"Dernier chargement : {stats['last_load_date'].strftime('%Y-%m-%d %H:%M')}")
-else:
-    st.warning("Base de données non disponible. Lancer `make init-db`.")
-
-st.markdown("")
-
-# ── Class distribution ───────────────────────────────────────────────────────
-
-
 @st.cache_data(ttl=30)
 def get_class_distribution():
     try:
@@ -108,34 +84,6 @@ def get_class_distribution():
         return df
     except Exception:
         return None
-
-
-dist_df = get_class_distribution()
-
-if dist_df is not None and len(dist_df) > 0:
-    # Sort by count ascending so largest bar is at the top
-    plot_df = dist_df.sort_values("count", ascending=True)
-    plot_df["prdtypecode"] = plot_df["prdtypecode"].astype(str)
-
-    fig = px.bar(
-        plot_df,
-        x="count",
-        y="prdtypecode",
-        orientation="h",
-        title="Distribution des classes (données brutes)",
-        labels={"prdtypecode": "Code catégorie", "count": "Nombre de produits"},
-    )
-    fig.update_traces(marker_color="#1f77b4")
-    fig.update_layout(yaxis=dict(type="category"))
-    st.plotly_chart(fig, use_container_width=True)
-
-    imbalance = dist_df["count"].max() / dist_df["count"].min() if dist_df["count"].min() > 0 else 0
-    st.caption(
-        f"{len(dist_df)} classes — ratio de déséquilibre : **{imbalance:.1f}x** "
-        f"(classe la plus fréquente / la plus rare)"
-    )
-
-# ── Load history ─────────────────────────────────────────────────────────────
 
 
 @st.cache_data(ttl=30)
@@ -156,12 +104,69 @@ def get_load_history():
         return None
 
 
+# ---------------------------------------------------------------------------
+# Section 1 : Jeu de donnees
+# ---------------------------------------------------------------------------
+
+st.header("Jeu de donnees")
+
+st.markdown(
+    "Le catalogue Rakuten France est utilise comme donnees d'entrainement. "
+    "Chaque produit possede une **designation** (titre court), une **description** "
+    "optionnelle (texte plus long), une **image** et un **code categorie** "
+    "(le label a predire). Le jeu de donnees contient 27 categories de produits."
+)
+
+stats = get_database_stats()
+
+if stats:
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Produits en base", f"{stats['total_products']:,}")
+    c2.metric("Classes", stats["total_classes"])
+    c3.metric("Donnees chargees", f"{stats['current_percentage']:.0f} %")
+
+    st.progress(stats["current_percentage"] / 100)
+    if stats["last_load_date"]:
+        st.caption(f"Dernier chargement : {stats['last_load_date'].strftime('%Y-%m-%d %H:%M')}")
+else:
+    st.warning("Base de donnees non disponible. Lancer `make init-db`.")
+
+dist_df = get_class_distribution()
+
+if dist_df is not None and len(dist_df) > 0:
+    plot_df = dist_df.sort_values("count", ascending=True)
+    plot_df["prdtypecode"] = plot_df["prdtypecode"].astype(str)
+
+    fig = px.bar(
+        plot_df,
+        x="count",
+        y="prdtypecode",
+        orientation="h",
+        title="Distribution des classes",
+        labels={"prdtypecode": "Code categorie", "count": "Nombre de produits"},
+    )
+    fig.update_traces(marker_color="#1f77b4")
+    fig.update_layout(yaxis=dict(type="category"))
+    st.plotly_chart(fig, use_container_width=True)
+
+    imbalance = (
+        dist_df["count"].max() / dist_df["count"].min()
+        if dist_df["count"].min() > 0
+        else 0
+    )
+    st.caption(
+        f"{len(dist_df)} classes -- ratio de desequilibre : **{imbalance:.1f}x** "
+        f"(classe la plus frequente / la plus rare)"
+    )
+
 history_df = get_load_history()
 
 if history_df is not None and len(history_df) > 0:
     st.subheader("Historique des chargements")
     display = history_df.copy()
-    display["completed_at"] = pd.to_datetime(display["completed_at"]).dt.strftime("%Y-%m-%d %H:%M")
+    display["completed_at"] = pd.to_datetime(display["completed_at"]).dt.strftime(
+        "%Y-%m-%d %H:%M"
+    )
     display["percentage"] = display["percentage"].apply(lambda x: f"{x:.0f} %")
     display["total_rows"] = display["total_rows"].apply(lambda x: f"{x:,}")
     st.dataframe(
@@ -170,35 +175,67 @@ if history_df is not None and len(history_df) > 0:
         hide_index=True,
         column_config={
             "batch_name": "Batch",
-            "percentage": "Chargé",
+            "percentage": "Charge",
             "total_rows": "Lignes",
             "completed_at": "Date",
         },
     )
 
+
+# ---------------------------------------------------------------------------
+# Section 2 : Ingestion des donnees
+# ---------------------------------------------------------------------------
+
 st.markdown("---")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Section 2 : Stratégie d'entraînement
-# ─────────────────────────────────────────────────────────────────────────────
-
-st.header("Stratégie d'entraînement")
+st.header("Ingestion des donnees")
 
 st.markdown("""
-**Chargement incrémental (+3 % / semaine)**
-Les données sont chargées progressivement de 40 % à 100 % pour simuler un flux réel
-de nouvelles données en production. Chaque chargement est tracé dans une table d'audit
-PostgreSQL, garantissant la reproductibilité complète de chaque entraînement.
+Les donnees brutes se presentent sous forme de fichiers CSV (`x_train.csv`
+pour les caracteristiques produit, `y_train.csv` pour les labels).
+Le pipeline d'ingestion les charge dans PostgreSQL en deux etapes.
 
-**Modèle : TF-IDF + Logistic Regression**
-Choix pragmatique pour un pipeline de classification texte : rapide à entraîner,
-facile à interpréter, et suffisamment performant pour un grand nombre de classes.
-Les features sont extraites via TF-IDF (unigrammes + bigrammes, 5 000 features max),
-puis classifiées par une Logistic Regression régularisée.
+**1. Stockage brut.**
+Les lignes des fichiers CSV sont inserees telles quelles dans la table
+`raw_products`. Chaque ligne conserve la designation, la description,
+l'identifiant image et le code categorie d'origine, accompagnes d'un
+`batch_id` et d'un horodatage `dt_ingested`.
 
-**Rééquilibrage par RandomOverSampling**
-Le dataset original est fortement déséquilibré (ratio jusqu'à ~30x).
-Avant chaque entraînement, un sur-échantillonnage aléatoire ramène toutes les classes
-au même effectif, évitant que le modèle ignore les classes minoritaires.
-Le dataset rééquilibré est loggé dans MLflow comme artifact pour traçabilité.
+**2. Traitement.**
+Une etape de nettoyage produit la table `processed_products` : les champs
+texte sont normalises (mise en minuscules, suppression du HTML et des
+caracteres speciaux), et les references images sont resolues vers leur
+chemin de stockage MinIO. Chaque ligne traitee porte egalement son
+`batch_id` et un horodatage `dt_processed`.
+
+Les tables `products` et `labels` contiennent la vue consolidee de
+l'ensemble des donnees ingerees et servent de source pour l'entrainement.
+""")
+
+
+# ---------------------------------------------------------------------------
+# Section 3 : Suivi des donnees
+# ---------------------------------------------------------------------------
+
+st.markdown("---")
+st.header("Suivi des donnees")
+
+st.markdown("""
+Chaque table du schema porte des horodatages et des identifiants de batch,
+ce qui permet de reconstituer le jeu de donnees exact utilise pour
+n'importe quel entrainement.
+
+- La table `data_loads` enregistre chaque batch d'ingestion avec ses
+  horodatages `started_at` / `completed_at`, le nombre de lignes chargees,
+  et une colonne JSONB `metadata` pour le contexte supplementaire.
+- La table `products_history` est alimentee automatiquement par un trigger :
+  chaque INSERT ou UPDATE sur `products` est journalise avec la date de
+  l'operation (`operation_date`) et le `load_batch_id` correspondant.
+- Lorsqu'un entrainement demarre, il interroge la base a un instant donne.
+  Comme chaque ligne de `products` possede un horodatage `created_at`,
+  la requete peut etre rejouee ulterieurement pour retrouver exactement
+  les memes lignes.
+
+Ainsi, pour tout modele enregistre dans MLflow, on peut remonter au batch
+exact, aux lignes exactes et au moment precis ou les donnees d'entrainement
+ont ete extraites.
 """)

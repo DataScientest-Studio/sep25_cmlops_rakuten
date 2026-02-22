@@ -76,7 +76,7 @@ def get_db_config():
                 'user': st.secrets['database'].get('user', 'rakuten_user'),
                 'password': st.secrets['database'].get('password', 'rakuten_pass')
             }
-    except (ImportError, AttributeError, KeyError):
+    except (ImportError, AttributeError, KeyError, FileNotFoundError):
         pass
     
     # Fall back to environment variables

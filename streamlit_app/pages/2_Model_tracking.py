@@ -91,37 +91,35 @@ Cela évite toute dégradation non contrôlée du service.
 
     st.header("Registre des modèles")
 
+    MODEL_NAME = "rakuten_classifier"
+
     if client:
         try:
-            registered_models = client.search_registered_models()
+            versions = client.search_model_versions(f"name='{MODEL_NAME}'")
 
-            if registered_models:
-                for model in registered_models:
-                    versions = client.search_model_versions(f"name='{model.name}'")
+            if versions:
+                version_data = []
+                for v in versions:
+                    version_data.append({
+                        "Version": v.version,
+                        "Stage": v.current_stage,
+                        "Créé le": datetime.fromtimestamp(
+                            v.creation_timestamp / 1000
+                        ).strftime("%Y-%m-%d %H:%M"),
+                        "Run ID": v.run_id[:8] if v.run_id else "N/A",
+                    })
 
-                    if versions:
-                        version_data = []
-                        for v in versions:
-                            version_data.append({
-                                "Version": v.version,
-                                "Stage": v.current_stage,
-                                "Créé le": datetime.fromtimestamp(
-                                    v.creation_timestamp / 1000
-                                ).strftime("%Y-%m-%d %H:%M"),
-                                "Run ID": v.run_id[:8] if v.run_id else "N/A",
-                            })
+                st.dataframe(
+                    pd.DataFrame(version_data),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
-                        st.dataframe(
-                            pd.DataFrame(version_data),
-                            use_container_width=True,
-                            hide_index=True,
-                        )
-
-                        c1, c2, c3, c4 = st.columns(4)
-                        c1.metric("Production", sum(1 for v in versions if v.current_stage == "Production"))
-                        c2.metric("Staging",    sum(1 for v in versions if v.current_stage == "Staging"))
-                        c3.metric("None",       sum(1 for v in versions if v.current_stage == "None"))
-                        c4.metric("Archived",   sum(1 for v in versions if v.current_stage == "Archived"))
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Production", sum(1 for v in versions if v.current_stage == "Production"))
+                c2.metric("Staging",    sum(1 for v in versions if v.current_stage == "Staging"))
+                c3.metric("None",       sum(1 for v in versions if v.current_stage == "None"))
+                c4.metric("Archived",   sum(1 for v in versions if v.current_stage == "Archived"))
             else:
                 st.info("Aucun modèle enregistré. Lancez un premier entraînement.")
 
