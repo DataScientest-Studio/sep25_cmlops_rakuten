@@ -1,5 +1,8 @@
 .PHONY: help setup start stop restart logs clean init-db status load-data generate-dataset test
 
+# Git commit SHA (injected into containers for MLflow tracking)
+GIT_SHA := $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
+
 # Colors for output
 BLUE := \033[0;34m
 GREEN := \033[0;32m
@@ -25,7 +28,7 @@ setup: ## Initial setup: copy env file and create directories
 
 start: ## Start all services (Postgres, MLflow, MinIO, API, Monitoring, Airflow)
 	@echo "$(BLUE)Starting all services...$(NC)"
-	docker compose up -d
+	GIT_COMMIT_SHA=$(GIT_SHA) docker compose up -d
 	@echo "$(GREEN)All services started!$(NC)"
 	@echo "$(YELLOW)MLflow UI: http://localhost:5000$(NC)"
 	@echo "$(YELLOW)API: http://localhost:8000/docs$(NC)"
@@ -183,10 +186,10 @@ demo: setup start init-db ## Quick setup for demo (setup + start + init-db)
 # ============================================================================
 start-orchestrator: ## Start Airflow (webserver + scheduler)
 	@echo "$(BLUE)Starting Airflow orchestrator...$(NC)"
-	docker compose up -d airflow-init
+	GIT_COMMIT_SHA=$(GIT_SHA) docker compose up -d airflow-init
 	@echo "$(YELLOW)Waiting for Airflow init to complete...$(NC)"
 	@docker wait rakuten_airflow_init 2>/dev/null || true
-	docker compose up -d airflow-webserver airflow-scheduler
+	GIT_COMMIT_SHA=$(GIT_SHA) docker compose up -d airflow-webserver airflow-scheduler
 	@echo "$(GREEN)Airflow started!$(NC)"
 	@echo "$(YELLOW)Airflow UI: http://localhost:8080 (admin/admin)$(NC)"
 

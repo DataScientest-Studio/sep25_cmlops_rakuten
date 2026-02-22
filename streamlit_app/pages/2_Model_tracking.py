@@ -100,6 +100,15 @@ Cela évite toute dégradation non contrôlée du service.
             if versions:
                 version_data = []
                 for v in versions:
+                    git_sha = "N/A"
+                    if v.run_id:
+                        try:
+                            run = client.get_run(v.run_id)
+                            git_sha = run.data.tags.get("git_commit_sha", "N/A")
+                            if git_sha and git_sha != "unknown" and len(git_sha) > 8:
+                                git_sha = git_sha[:8]
+                        except Exception:
+                            pass
                     version_data.append({
                         "Version": v.version,
                         "Stage": v.current_stage,
@@ -107,6 +116,7 @@ Cela évite toute dégradation non contrôlée du service.
                             v.creation_timestamp / 1000
                         ).strftime("%Y-%m-%d %H:%M"),
                         "Run ID": v.run_id[:8] if v.run_id else "N/A",
+                        "Git SHA": git_sha,
                     })
 
                 st.dataframe(

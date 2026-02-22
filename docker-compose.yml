@@ -42,6 +42,7 @@ x-airflow-common:
         DRIFT_ALERT_THRESHOLD: ${DRIFT_ALERT_THRESHOLD:-0.2}
         DRIFT_CRITICAL_THRESHOLD: ${DRIFT_CRITICAL_THRESHOLD:-0.3}
         INFERENCE_LOG_PATH: /opt/airflow/data/monitoring/inference_log.csv
+        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
     volumes:
         - ./orchestration/dags:/opt/airflow/dags
         - ./src:/opt/airflow/src

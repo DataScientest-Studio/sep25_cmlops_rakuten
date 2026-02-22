@@ -267,7 +267,10 @@ def train_model(
         mlflow.log_dict(class_names_dict, "class_names.json")
 
         # Add tags
-        tags = {"model_type": "tfidf_logreg"}
+        tags = {
+            "model_type": "tfidf_logreg",
+            "git_commit_sha": os.getenv("GIT_COMMIT_SHA", "unknown"),
+        }
         if dataset_run_id:
             tags["dataset_run_id"] = dataset_run_id
         if week_number:
