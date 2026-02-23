@@ -48,7 +48,7 @@ PIPELINE_CONFIG = {
 
 # Airflow Configuration
 AIRFLOW_CONFIG = {
-    "schedule": os.getenv("AIRFLOW_SCHEDULE", "0 2 * * 1"),  # Every Monday at 2 AM
+    "schedule": os.getenv("AIRFLOW_SCHEDULE", "5 7 * * 1"),  # Every Monday at 8:05 AM Paris time
 }
 
 # Auto-Training & Promotion Configuration

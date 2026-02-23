@@ -36,7 +36,7 @@ x-airflow-common:
         ENVIRONMENT: docker
         MIN_F1_THRESHOLD: ${MIN_F1_THRESHOLD:-0.75}
         AUTO_PROMOTION_ENABLED: ${AUTO_PROMOTION_ENABLED:-true}
-        AIRFLOW_SCHEDULE: ${AIRFLOW_SCHEDULE:-0 2 * * 1}
+        AIRFLOW_SCHEDULE: ${AIRFLOW_SCHEDULE:-5 7 * * 1}
         DRIFT_CHECK_SCHEDULE: ${DRIFT_CHECK_SCHEDULE:-0 1 * * *}
         DRIFT_WARNING_THRESHOLD: ${DRIFT_WARNING_THRESHOLD:-0.1}
         DRIFT_ALERT_THRESHOLD: ${DRIFT_ALERT_THRESHOLD:-0.2}
@@ -48,6 +48,7 @@ x-airflow-common:
         - ./src:/opt/airflow/src
         - ./scripts:/opt/airflow/scripts
         - ./data:/opt/airflow/data
+        - ./.git:/opt/airflow/.git:ro
         - airflow_logs:/opt/airflow/logs
     networks:
         - rakuten_network

@@ -9,12 +9,11 @@ Orchestrates the complete weekly ML pipeline:
   5. Promote model if F1 > threshold and better than current production
   6. Log pipeline summary
 
-Schedule: Every Monday at 2:00 AM (configurable via AIRFLOW_SCHEDULE env var)
+Schedule: Every Monday at 8:05 AM Paris time (configurable via AIRFLOW_SCHEDULE env var)
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.utils.dates import days_ago
 import sys
 import os
 
@@ -32,7 +31,7 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
-SCHEDULE = os.getenv("AIRFLOW_SCHEDULE", "0 2 * * 1")
+SCHEDULE = os.getenv("AIRFLOW_SCHEDULE", "5 7 * * 1")
 
 
 # =============================================================================
@@ -226,7 +225,7 @@ with DAG(
     default_args=default_args,
     description="Weekly: Load data -> Train model -> Promote if better",
     schedule_interval=SCHEDULE,
-    start_date=days_ago(1),
+    start_date=datetime(2026, 2, 16),
     catchup=False,
     tags=["ml", "rakuten", "weekly", "auto"],
 ) as dag:

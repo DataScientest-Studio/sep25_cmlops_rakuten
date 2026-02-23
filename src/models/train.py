@@ -36,6 +36,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _resolve_git_sha() -> str:
+    """Resolve git commit SHA from env var, .git/HEAD file, or subprocess."""
+    sha = os.getenv("GIT_COMMIT_SHA", "")
+    if sha and sha != "unknown":
+        return sha
+
+    for git_dir in ["/opt/airflow/.git", str(Path(__file__).parent.parent.parent / ".git")]:
+        try:
+            head_path = Path(git_dir) / "HEAD"
+            content = head_path.read_text().strip()
+            if content.startswith("ref:"):
+                ref_path = Path(git_dir) / content.split("ref:", 1)[1].strip()
+                return ref_path.read_text().strip()
+            return content
+        except (OSError, IOError):
+            continue
+
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    return "unknown"
+
+
 def load_dataset_from_mlflow(dataset_run_id: str) -> tuple:
     """
     Load dataset from MLflow artifacts.
@@ -269,7 +299,7 @@ def train_model(
         # Add tags
         tags = {
             "model_type": "tfidf_logreg",
-            "git_commit_sha": os.getenv("GIT_COMMIT_SHA", "unknown"),
+            "git_commit_sha": _resolve_git_sha(),
         }
         if dataset_run_id:
             tags["dataset_run_id"] = dataset_run_id
